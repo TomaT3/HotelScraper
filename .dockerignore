@@ -1,0 +1,5 @@
+# Vite output (built to backend/static)
+frontend/dist/
+
+# Frontend build inside backend
+backend/static/

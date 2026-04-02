@@ -1,0 +1,196 @@
+import { useCallback, useEffect, useState } from "react";
+import StatusBar from "./components/StatusBar";
+import HotelFilter from "./components/HotelFilter";
+import DateRangePicker from "./components/DateRangePicker";
+import HotelChart from "./components/HotelChart";
+import { getHotels, getPrices, getStatus, triggerFetch } from "./api/client";
+import type { Hotel, HotelPrices, Status, FetchResult } from "./api/types";
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function yearLaterStr(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+export default function App() {
+  const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [prices, setPrices] = useState<HotelPrices[]>([]);
+  const [status, setStatus] = useState<Status | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [starFilter, setStarFilter] = useState<number | null>(null);
+  const [dateFrom, setDateFrom] = useState(todayStr());
+  const [dateTo, setDateTo] = useState(yearLaterStr());
+  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
+  const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
+
+  // Initial load
+  useEffect(() => {
+    async function load() {
+      try {
+        const [h, s] = await Promise.all([getHotels(), getStatus()]);
+        setHotels(h);
+        setStatus(s);
+        // Auto-select all active hotels
+        const activeIds = new Set(h.filter((x) => x.active).map((x) => x.id));
+        setSelectedIds(activeIds);
+      } catch (e) {
+        console.error("Failed to load initial data:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  // Fetch prices when selection or dates change
+  useEffect(() => {
+    if (selectedIds.size === 0) {
+      setPrices([]);
+      return;
+    }
+    let cancelled = false;
+    async function loadPrices() {
+      try {
+        const p = await getPrices({
+          hotelIds: Array.from(selectedIds),
+          from: dateFrom,
+          to: dateTo,
+        });
+        if (!cancelled) setPrices(p);
+      } catch (e) {
+        console.error("Failed to load prices:", e);
+      }
+    }
+    loadPrices();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedIds, dateFrom, dateTo]);
+
+  const handleToggle = useCallback((id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    const filtered = starFilter
+      ? hotels.filter((h) => h.stars !== null && h.stars >= starFilter)
+      : hotels;
+    setSelectedIds(new Set(filtered.map((h) => h.id)));
+  }, [hotels, starFilter]);
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleFetch = useCallback(async () => {
+    setFetching(true);
+    setFetchResult(null);
+    try {
+      const result = await triggerFetch();
+      setFetchResult(result);
+      // Reload data
+      const [h, s] = await Promise.all([getHotels(), getStatus()]);
+      setHotels(h);
+      setStatus(s);
+      // Re-select all active
+      const activeIds = new Set(h.filter((x) => x.active).map((x) => x.id));
+      setSelectedIds(activeIds);
+    } catch (e) {
+      console.error("Fetch failed:", e);
+    } finally {
+      setFetching(false);
+    }
+  }, []);
+
+  const handleDateChange = useCallback((from: string, to: string) => {
+    setDateFrom(from);
+    setDateTo(to);
+  }, []);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-bold text-gray-800">
+          🏨 Stuttgart Hotel Price Tracker
+        </h1>
+      </div>
+
+      {/* Status bar */}
+      <StatusBar
+        status={status}
+        loading={loading}
+        onFetch={handleFetch}
+        fetching={fetching}
+      />
+
+      {/* Fetch result notification */}
+      {fetchResult && (
+        <div
+          className={`rounded-lg p-3 text-sm ${
+            fetchResult.errors.length > 0
+              ? "bg-yellow-50 text-yellow-800 border border-yellow-200"
+              : "bg-green-50 text-green-800 border border-green-200"
+          }`}
+        >
+          <span className="font-medium">Abruf abgeschlossen:</span>{" "}
+          {fetchResult.dates_fetched} Tage, {fetchResult.prices_saved} Preise
+          gespeichert, {fetchResult.hotels_found} Hotels gefunden.
+          {fetchResult.errors.length > 0 && (
+            <details className="mt-1">
+              <summary className="cursor-pointer text-yellow-600">
+                {fetchResult.errors.length} Fehler anzeigen
+              </summary>
+              <ul className="mt-1 list-disc list-inside">
+                {fetchResult.errors.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
+      {/* Filters + Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* Left sidebar: filters */}
+        <div className="space-y-4">
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onChange={handleDateChange}
+          />
+          <HotelFilter
+            hotels={hotels}
+            selectedIds={selectedIds}
+            onToggle={handleToggle}
+            onSelectAll={handleSelectAll}
+            onDeselectAll={handleDeselectAll}
+            starFilter={starFilter}
+            onStarFilterChange={setStarFilter}
+          />
+        </div>
+
+        {/* Main chart area */}
+        <div className="lg:col-span-3">
+          <HotelChart data={prices} selectedIds={selectedIds} />
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="text-center text-xs text-gray-400 pt-4">
+        Daten via Booking.com (RapidAPI) · Preise für Doppelzimmer / 1 Nacht / 2 Erwachsene
+      </div>
+    </div>
+  );
+}

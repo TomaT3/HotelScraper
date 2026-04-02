@@ -1,0 +1,20 @@
+services:
+  hotelscraper:
+    build: .
+    container_name: hotel-price-tracker
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - RAPIDAPI_KEY=${RAPIDAPI_KEY}
+      - DATABASE_URL=sqlite+aiosqlite:///./data/hotel_prices.db
+      - DATES_PER_RUN=${DATES_PER_RUN:-15}
+      - FETCH_HOUR=${FETCH_HOUR:-3}
+      - SEARCH_CITY=${SEARCH_CITY:-Stuttgart}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
