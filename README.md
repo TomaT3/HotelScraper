@@ -14,7 +14,7 @@ Web-App die täglich Hotelpreise für Doppelzimmer in Stuttgart über die Bookin
 
 ## Voraussetzungen
 
-1. **RapidAPI Key** für die [Booking.com API (Tipsters)](https://rapidapi.com/tipsters/api/booking-com)
+1. **RapidAPI Key** für die [Booking.com API (DataCrawler)](https://rapidapi.com/DataCrawler/api/booking-com15)
    - Kostenlosen Account erstellen auf [rapidapi.com](https://rapidapi.com)
    - „Booking.com" API subscriben (Free Tier reicht)
    - API Key aus dem Dashboard kopieren
@@ -56,6 +56,11 @@ Alle Einstellungen werden über Umgebungsvariablen gesetzt (`.env` oder `docker-
 | Variable | Default | Beschreibung |
 |---|---|---|
 | `RAPIDAPI_KEY` | — | **Pflicht.** Dein RapidAPI Key |
+| `RAPIDAPI_HOST` | `booking-com15.p.rapidapi.com` | RapidAPI Hostname |
+| `RAPIDAPI_BASE_URL` | `https://booking-com15.p.rapidapi.com` | API Basis-URL |
+| `RAPIDAPI_LOCATION_ENDPOINT` | `/api/v1/hotels/locations` | Endpoint für Zielortsuche |
+| `RAPIDAPI_HOTELS_ENDPOINT` | `/api/v1/hotels/search` | Endpoint für Hotelsuche |
+| `APP_VERSION` | `1.0.0` | Version, die in `/api/status` und im Client angezeigt wird |
 | `DATES_PER_RUN` | `15` | Wie viele Tage pro Scheduler-Lauf abgerufen werden |
 | `FETCH_HOUR` | `3` | Uhrzeit (Stunde, 0-23) für den täglichen Abruf |
 | `SEARCH_CITIES` | `Stuttgart` | Städte für die Hotelsuche (komma-getrennt, z.B. `Stuttgart,München,Berlin`) |
@@ -142,7 +147,7 @@ Browser → FastAPI (Port 8000)
 
 ## Datenquelle
 
-Preise werden über die **[Booking.com API auf RapidAPI](https://rapidapi.com/tipsters/api/booking-com)** (von Tipsters) abgerufen. Der Free Tier erlaubt ~500 Requests/Monat, was bei 15 Dates/Tag für eine monatliche Rotation ausreicht.
+Preise werden über die **[Booking.com API auf RapidAPI](https://rapidapi.com/DataCrawler/api/booking-com15)** (von DataCrawler) abgerufen. Der Free Tier erlaubt nur begrenzte Requests, deshalb sollte `DATES_PER_RUN` auf den gebuchten Tarif abgestimmt werden.
 
 **Hinweis:** Dies ist eine inoffizielle API. Preise und Verfügbarkeit können von den tatsächlichen Booking.com-Preisen abweichen.
 

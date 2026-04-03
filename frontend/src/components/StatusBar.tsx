@@ -70,6 +70,10 @@ export default function StatusBar({
               {status.scheduler_running ? "Aktiv" : "Inaktiv"}
             </span>
           </div>
+          <div>
+            <span className="text-gray-500">Version:</span>{" "}
+            <span className="font-mono text-xs font-semibold">{status.version}</span>
+          </div>
         </div>
         <button
           onClick={onFetch}

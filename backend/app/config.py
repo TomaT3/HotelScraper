@@ -5,6 +5,11 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     rapidapi_key: str = ""
+    rapidapi_host: str = "booking-com15.p.rapidapi.com"
+    rapidapi_base_url: str = "https://booking-com15.p.rapidapi.com"
+    rapidapi_location_endpoint: str = "/api/v1/hotels/locations"
+    rapidapi_hotels_endpoint: str = "/api/v1/hotels/search"
+    app_version: str = "1.0.0"
     database_url: str = "sqlite+aiosqlite:///./data/hotel_prices.db"
     dates_per_run: int = 15
     fetch_hour: int = 3

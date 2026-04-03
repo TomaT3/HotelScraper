@@ -253,7 +253,7 @@ export default function App() {
 
       {/* Footer */}
       <div className="text-center text-xs text-gray-400 pt-4">
-        Daten via Booking.com (RapidAPI) · Preise für Doppelzimmer / 1 Nacht / 2 Erwachsene
+        Daten via Booking.com (RapidAPI DataCrawler) · Preise für Doppelzimmer / 1 Nacht / 2 Erwachsene
       </div>
     </div>
   );

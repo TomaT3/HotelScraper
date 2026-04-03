@@ -111,6 +111,7 @@ async def get_status(
 
     return StatusOut(
         city=city,
+        version=settings.app_version,
         total_hotels=total_hotels,
         active_hotels=active_hotels,
         total_prices=total_prices,

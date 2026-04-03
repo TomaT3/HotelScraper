@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Hotel Price Tracker",
-    version="1.0.0",
+    version=settings.app_version,
     lifespan=lifespan,
 )
 

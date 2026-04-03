@@ -29,6 +29,7 @@ export interface HotelPrices {
 
 export interface Status {
   city: string | null;
+  version: string;
   total_hotels: number;
   active_hotels: number;
   total_prices: number;

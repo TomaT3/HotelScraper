@@ -39,6 +39,7 @@ class HotelPrices(BaseModel):
 
 class StatusOut(BaseModel):
     city: str | None = None
+    version: str
     total_hotels: int
     active_hotels: int
     total_prices: int

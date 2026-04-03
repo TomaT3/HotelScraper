@@ -8,6 +8,11 @@ services:
       - ./data:/app/data
     environment:
       - RAPIDAPI_KEY=${RAPIDAPI_KEY}
+      - RAPIDAPI_HOST=${RAPIDAPI_HOST:-booking-com15.p.rapidapi.com}
+      - RAPIDAPI_BASE_URL=${RAPIDAPI_BASE_URL:-https://booking-com15.p.rapidapi.com}
+      - RAPIDAPI_LOCATION_ENDPOINT=${RAPIDAPI_LOCATION_ENDPOINT:-/api/v1/hotels/locations}
+      - RAPIDAPI_HOTELS_ENDPOINT=${RAPIDAPI_HOTELS_ENDPOINT:-/api/v1/hotels/search}
+      - APP_VERSION=${APP_VERSION:-1.0.0}
       - DATABASE_URL=sqlite+aiosqlite:///./data/hotel_prices.db
       - DATES_PER_RUN=${DATES_PER_RUN:-15}
       - FETCH_HOUR=${FETCH_HOUR:-3}
