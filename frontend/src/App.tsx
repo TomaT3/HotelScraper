@@ -3,8 +3,9 @@ import StatusBar from "./components/StatusBar";
 import HotelFilter from "./components/HotelFilter";
 import DateRangePicker from "./components/DateRangePicker";
 import HotelChart from "./components/HotelChart";
-import { getHotels, getPrices, getStatus, triggerFetch } from "./api/client";
-import type { Hotel, HotelPrices, Status, FetchResult } from "./api/types";
+import CitySelector from "./components/CitySelector";
+import { getCities, getHotels, getPrices, getStatus, triggerFetch } from "./api/client";
+import type { City, Hotel, HotelPrices, Status, FetchResult } from "./api/types";
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -17,6 +18,8 @@ function yearLaterStr(): string {
 }
 
 export default function App() {
+  const [cities, setCities] = useState<City[]>([]);
+  const [selectedCity, setSelectedCity] = useState<string>("");
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [prices, setPrices] = useState<HotelPrices[]>([]);
   const [status, setStatus] = useState<Status | null>(null);
@@ -28,24 +31,53 @@ export default function App() {
   const [fetching, setFetching] = useState(false);
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
 
-  // Initial load
+  // Load cities on mount
   useEffect(() => {
-    async function load() {
+    async function loadCities() {
       try {
-        const [h, s] = await Promise.all([getHotels(), getStatus()]);
+        const c = await getCities();
+        setCities(c);
+        if (c.length > 0) {
+          setSelectedCity(c[0].name);
+        }
+      } catch (e) {
+        console.error("Failed to load cities:", e);
+      }
+    }
+    loadCities();
+  }, []);
+
+  // Load hotels + status when city changes
+  useEffect(() => {
+    if (!selectedCity) return;
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      try {
+        const [h, s] = await Promise.all([
+          getHotels(selectedCity),
+          getStatus(selectedCity),
+        ]);
+        if (cancelled) return;
         setHotels(h);
         setStatus(s);
         // Auto-select all active hotels
         const activeIds = new Set(h.filter((x) => x.active).map((x) => x.id));
         setSelectedIds(activeIds);
+        setStarFilter(null);
+        setFetchResult(null);
       } catch (e) {
-        console.error("Failed to load initial data:", e);
+        console.error("Failed to load data for city:", e);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     load();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCity]);
 
   // Fetch prices when selection or dates change
   useEffect(() => {
@@ -72,6 +104,12 @@ export default function App() {
     };
   }, [selectedIds, dateFrom, dateTo]);
 
+  const handleCityChange = useCallback((city: string) => {
+    setSelectedCity(city);
+    setPrices([]);
+    setSelectedIds(new Set());
+  }, []);
+
   const handleToggle = useCallback((id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -96,21 +134,25 @@ export default function App() {
     setFetching(true);
     setFetchResult(null);
     try {
-      const result = await triggerFetch();
+      const result = await triggerFetch(selectedCity || undefined);
       setFetchResult(result);
-      // Reload data
-      const [h, s] = await Promise.all([getHotels(), getStatus()]);
-      setHotels(h);
-      setStatus(s);
-      // Re-select all active
-      const activeIds = new Set(h.filter((x) => x.active).map((x) => x.id));
-      setSelectedIds(activeIds);
+      // Reload data for current city
+      if (selectedCity) {
+        const [h, s] = await Promise.all([
+          getHotels(selectedCity),
+          getStatus(selectedCity),
+        ]);
+        setHotels(h);
+        setStatus(s);
+        const activeIds = new Set(h.filter((x) => x.active).map((x) => x.id));
+        setSelectedIds(activeIds);
+      }
     } catch (e) {
       console.error("Fetch failed:", e);
     } finally {
       setFetching(false);
     }
-  }, []);
+  }, [selectedCity]);
 
   const handleDateChange = useCallback((from: string, to: string) => {
     setDateFrom(from);
@@ -120,10 +162,15 @@ export default function App() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <h1 className="text-2xl font-bold text-gray-800">
-          🏨 Stuttgart Hotel Price Tracker
+          🏨 {selectedCity || "Hotel"} Hotel Price Tracker
         </h1>
+        <CitySelector
+          cities={cities}
+          selectedCity={selectedCity}
+          onCityChange={handleCityChange}
+        />
       </div>
 
       {/* Status bar */}

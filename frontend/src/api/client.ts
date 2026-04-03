@@ -1,4 +1,4 @@
-import type { Hotel, HotelPrices, Status, FetchResult } from "./types";
+import type { City, Hotel, HotelPrices, Status, FetchResult } from "./types";
 
 const BASE = "/api";
 
@@ -11,8 +11,12 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
-export async function getHotels(): Promise<Hotel[]> {
-  return fetchJson<Hotel[]>(`${BASE}/hotels`);
+export async function getCities(): Promise<City[]> {
+  return fetchJson<City[]>(`${BASE}/cities`);
+}
+
+export async function getHotels(city: string): Promise<Hotel[]> {
+  return fetchJson<Hotel[]>(`${BASE}/hotels?city=${encodeURIComponent(city)}`);
 }
 
 export async function updateHotel(
@@ -42,11 +46,15 @@ export async function getPrices(params?: {
   return fetchJson<HotelPrices[]>(`${BASE}/prices${qs ? `?${qs}` : ""}`);
 }
 
-export async function getStatus(): Promise<Status> {
-  return fetchJson<Status>(`${BASE}/status`);
+export async function getStatus(city?: string): Promise<Status> {
+  const qs = city ? `?city=${encodeURIComponent(city)}` : "";
+  return fetchJson<Status>(`${BASE}/status${qs}`);
 }
 
-export async function triggerFetch(maxDates?: number): Promise<FetchResult> {
-  const qs = maxDates ? `?max_dates=${maxDates}` : "";
-  return fetchJson<FetchResult>(`${BASE}/fetch${qs}`, { method: "POST" });
+export async function triggerFetch(city?: string, maxDates?: number): Promise<FetchResult> {
+  const params = new URLSearchParams();
+  if (city) params.set("city", city);
+  if (maxDates) params.set("max_dates", String(maxDates));
+  const qs = params.toString();
+  return fetchJson<FetchResult>(`${BASE}/fetch${qs ? `?${qs}` : ""}`, { method: "POST" });
 }

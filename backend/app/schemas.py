@@ -11,8 +11,14 @@ class HotelOut(BaseModel):
     review_score: float | None = None
     image_url: str | None = None
     active: bool
+    city: str
 
     model_config = {"from_attributes": True}
+
+
+class CityOut(BaseModel):
+    name: str
+    dest_label: str | None = None
 
 
 class HotelUpdate(BaseModel):
@@ -32,6 +38,7 @@ class HotelPrices(BaseModel):
 
 
 class StatusOut(BaseModel):
+    city: str | None = None
     total_hotels: int
     active_hotels: int
     total_prices: int

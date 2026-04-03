@@ -5,8 +5,10 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from sqlalchemy import text
 
-from app.database import init_db
+from app.database import init_db, engine
+from app.config import settings
 from app.routers import hotels, prices
 from app.services.scheduler import start_scheduler, stop_scheduler
 
@@ -17,10 +19,35 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def migrate_add_city_column():
+    """Add 'city' column to hotels table if it doesn't exist, and backfill."""
+    default_city = settings.city_list[0]
+    async with engine.begin() as conn:
+        # Check if column exists
+        result = await conn.execute(text("PRAGMA table_info(hotels)"))
+        columns = [row[1] for row in result.fetchall()]
+        if "city" not in columns:
+            logger.info("Migrating: adding 'city' column to hotels table...")
+            await conn.execute(text("ALTER TABLE hotels ADD COLUMN city TEXT NOT NULL DEFAULT ''"))
+            await conn.execute(text("UPDATE hotels SET city = :city WHERE city = ''"), {"city": default_city})
+            # Drop old unique index on booking_id and create new one on (booking_id, city)
+            try:
+                await conn.execute(text("DROP INDEX IF EXISTS ix_hotels_booking_id"))
+            except Exception:
+                pass
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_hotels_city ON hotels (city)"))
+            await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_booking_city ON hotels (booking_id, city)"))
+            logger.info("Migration complete: city column added, default='%s'", default_city)
+        else:
+            # Backfill any empty city values
+            await conn.execute(text("UPDATE hotels SET city = :city WHERE city = '' OR city IS NULL"), {"city": default_city})
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting Hotel Price Tracker...")
     await init_db()
+    await migrate_add_city_column()
     start_scheduler()
     yield
     stop_scheduler()
@@ -28,7 +55,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Stuttgart Hotel Price Tracker",
+    title="Hotel Price Tracker",
     version="1.0.0",
     lifespan=lifespan,
 )

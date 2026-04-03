@@ -8,13 +8,18 @@ class Hotel(Base):
     __tablename__ = "hotels"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    booking_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    booking_id: Mapped[str] = mapped_column(String, index=True)
     name: Mapped[str] = mapped_column(String)
     address: Mapped[str | None] = mapped_column(String, nullable=True)
     stars: Mapped[int | None] = mapped_column(Integer, nullable=True)
     review_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    city: Mapped[str] = mapped_column(String, index=True, default="")
+
+    __table_args__ = (
+        UniqueConstraint("booking_id", "city", name="uq_booking_city"),
+    )
 
 
 class Price(Base):

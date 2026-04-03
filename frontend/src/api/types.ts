@@ -7,6 +7,12 @@ export interface Hotel {
   review_score: number | null;
   image_url: string | null;
   active: boolean;
+  city: string;
+}
+
+export interface City {
+  name: string;
+  dest_label: string | null;
 }
 
 export interface PricePoint {
@@ -22,6 +28,7 @@ export interface HotelPrices {
 }
 
 export interface Status {
+  city: string | null;
   total_hotels: number;
   active_hotels: number;
   total_prices: number;
