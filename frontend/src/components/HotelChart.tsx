@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -5,7 +6,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import type { HotelPrices } from "../api/types";
@@ -28,8 +28,30 @@ interface ChartDataPoint {
   [hotelName: string]: number | string;
 }
 
+function useWindowWidth() {
+  const [width, setWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const handler = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return width;
+}
+
 export default function HotelChart({ data, selectedIds }: Props) {
+  const [hoveredHotel, setHoveredHotel] = useState<string | null>(null);
+  const [legendOpen, setLegendOpen] = useState(true);
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
+
   const filtered = data.filter((h) => selectedIds.has(h.hotel_id));
+  const isMany = filtered.length > 15;
+
+  // Auto-collapse legend on mobile with many hotels
+  useEffect(() => {
+    if (isMobile && isMany) setLegendOpen(false);
+    else if (!isMobile) setLegendOpen(true);
+  }, [isMobile, isMany]);
 
   if (filtered.length === 0) {
     return (
@@ -64,11 +86,16 @@ export default function HotelChart({ data, selectedIds }: Props) {
     return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
   };
 
-  // Custom tooltip
+  // Custom tooltip – when hovering a legend item, show only that hotel
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
+
+    const items = hoveredHotel
+      ? payload.filter((e: any) => e.name === hoveredHotel)
+      : payload.sort((a: any, b: any) => (a.value ?? 0) - (b.value ?? 0));
+
     return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm max-w-xs">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm max-w-xs max-h-60 overflow-y-auto">
         <p className="font-semibold mb-1">
           {new Date(label + "T00:00:00").toLocaleDateString("de-DE", {
             weekday: "short",
@@ -77,59 +104,108 @@ export default function HotelChart({ data, selectedIds }: Props) {
             year: "numeric",
           })}
         </p>
-        {payload
-          .sort((a: any, b: any) => (a.value ?? 0) - (b.value ?? 0))
-          .map((entry: any, i: number) => (
-            <div key={i} className="flex justify-between gap-4">
-              <span style={{ color: entry.color }} className="truncate">
-                {entry.name}
-              </span>
-              <span className="font-medium">{entry.value?.toFixed(0)} €</span>
-            </div>
-          ))}
+        {items.map((entry: any, i: number) => (
+          <div key={i} className="flex justify-between gap-4">
+            <span style={{ color: entry.color }} className="truncate">
+              {entry.name}
+            </span>
+            <span className="font-medium">{entry.value?.toFixed(0)} €</span>
+          </div>
+        ))}
       </div>
     );
   };
 
+  const chartHeight = isMobile ? 300 : isMany ? 450 : 500;
+
   return (
-    <div className="bg-white rounded-lg shadow p-4">
-      <h3 className="font-semibold text-gray-700 mb-4">
+    <div className="bg-white rounded-lg shadow p-2 sm:p-4">
+      <h3 className="font-semibold text-gray-700 mb-2 sm:mb-4 text-sm sm:text-base">
         Preisverlauf — Doppelzimmer / Nacht
       </h3>
-      <ResponsiveContainer width="100%" height={500}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis
             dataKey="date"
             tickFormatter={formatDate}
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: isMobile ? 9 : 11 }}
             interval="preserveStartEnd"
-            minTickGap={40}
+            minTickGap={isMobile ? 30 : 40}
           />
           <YAxis
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: isMobile ? 9 : 11 }}
             tickFormatter={(v) => `${v} €`}
-            width={70}
+            width={isMobile ? 50 : 70}
           />
           <Tooltip content={<CustomTooltip />} />
-          <Legend
-            wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }}
-            iconType="plainline"
-          />
           {filtered.map((hotel, i) => (
             <Line
               key={hotel.hotel_id}
               type="monotone"
               dataKey={hotel.hotel_name}
               stroke={COLORS[i % COLORS.length]}
-              strokeWidth={2}
+              strokeWidth={
+                hoveredHotel === hotel.hotel_name ? 3 : isMany ? 1.5 : 2
+              }
+              strokeOpacity={
+                hoveredHotel
+                  ? hoveredHotel === hotel.hotel_name
+                    ? 1
+                    : 0.1
+                  : isMany
+                  ? 0.5
+                  : 1
+              }
               dot={false}
               connectNulls
-              activeDot={{ r: 4 }}
+              activeDot={{ r: hoveredHotel === hotel.hotel_name ? 6 : 4 }}
+              isAnimationActive={false}
             />
           ))}
         </LineChart>
       </ResponsiveContainer>
+
+      {/* Custom interactive legend */}
+      <div className="mt-2 border-t pt-2">
+        <button
+          onClick={() => setLegendOpen(!legendOpen)}
+          className="text-xs text-gray-500 hover:text-gray-700 mb-1 flex items-center gap-1"
+        >
+          <span
+            className={`inline-block transition-transform ${
+              legendOpen ? "rotate-90" : ""
+            }`}
+          >
+            ▶
+          </span>
+          Legende ({filtered.length} Hotels)
+        </button>
+        {legendOpen && (
+          <div className="max-h-32 sm:max-h-48 overflow-y-auto text-xs flex flex-wrap gap-x-3 gap-y-0.5">
+            {filtered.map((hotel, i) => (
+              <span
+                key={hotel.hotel_id}
+                className="flex items-center gap-1 cursor-pointer whitespace-nowrap py-0.5"
+                onMouseEnter={() => setHoveredHotel(hotel.hotel_name)}
+                onMouseLeave={() => setHoveredHotel(null)}
+                style={{
+                  opacity:
+                    hoveredHotel && hoveredHotel !== hotel.hotel_name
+                      ? 0.3
+                      : 1,
+                }}
+              >
+                <span
+                  className="inline-block w-3 h-0.5 flex-shrink-0"
+                  style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                />
+                {hotel.hotel_name}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
