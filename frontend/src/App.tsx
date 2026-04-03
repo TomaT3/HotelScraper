@@ -4,6 +4,7 @@ import HotelFilter from "./components/HotelFilter";
 import DateRangePicker from "./components/DateRangePicker";
 import HotelChart from "./components/HotelChart";
 import CitySelector from "./components/CitySelector";
+import { ChevronDown } from "./components/Icons";
 import { getCities, getHotels, getPrices, getStatus, triggerFetch } from "./api/client";
 import type { City, Hotel, HotelPrices, Status, FetchResult } from "./api/types";
 
@@ -30,6 +31,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Load cities on mount
   useEffect(() => {
@@ -160,10 +162,10 @@ export default function App() {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-3 sm:space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-2xl font-bold text-gray-800">
+        <h1 className="text-lg sm:text-2xl font-bold text-gray-800">
           🏨 {selectedCity || "Hotel"} Hotel Price Tracker
         </h1>
         <CitySelector
@@ -210,8 +212,23 @@ export default function App() {
 
       {/* Filters + Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Left sidebar: filters */}
-        <div className="space-y-4">
+        {/* Mobile filter toggle */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="lg:hidden flex items-center justify-between bg-white rounded-lg shadow p-3 text-sm font-medium text-gray-700 order-2"
+        >
+          <span>Filter & Einstellungen</span>
+          <ChevronDown
+            className={`w-4 h-4 transition-transform ${showFilters ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        {/* Left sidebar: filters – always visible on desktop, collapsible on mobile */}
+        <div
+          className={`space-y-4 order-3 lg:order-1 ${
+            !showFilters ? "hidden lg:block" : ""
+          }`}
+        >
           <DateRangePicker
             from={dateFrom}
             to={dateTo}
@@ -228,8 +245,8 @@ export default function App() {
           />
         </div>
 
-        {/* Main chart area */}
-        <div className="lg:col-span-3">
+        {/* Main chart area – shown first on mobile */}
+        <div className="lg:col-span-3 order-1 lg:order-2">
           <HotelChart data={prices} selectedIds={selectedIds} />
         </div>
       </div>
