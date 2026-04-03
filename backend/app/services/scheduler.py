@@ -4,7 +4,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.config import settings
-from app.services.price_fetcher import fetch_prices_for_dates
+from app.services.price_fetcher import fetch_all_cities
 
 logger = logging.getLogger(__name__)
 
@@ -12,10 +12,11 @@ scheduler = AsyncIOScheduler()
 
 
 async def scheduled_fetch():
-    """Job that runs daily to fetch new hotel prices."""
-    logger.info("Scheduled fetch starting (max %d dates)...", settings.dates_per_run)
+    """Job that runs daily to fetch new hotel prices for all configured cities."""
+    cities = settings.city_list
+    logger.info("Scheduled fetch starting for %d cities (max %d dates each)...", len(cities), settings.dates_per_run)
     try:
-        result = await fetch_prices_for_dates()
+        result = await fetch_all_cities(max_dates=settings.dates_per_run)
         logger.info(
             "Scheduled fetch complete: %d dates, %d prices, %d errors",
             result["dates_fetched"],

@@ -58,7 +58,7 @@ Alle Einstellungen werden über Umgebungsvariablen gesetzt (`.env` oder `docker-
 | `RAPIDAPI_KEY` | — | **Pflicht.** Dein RapidAPI Key |
 | `DATES_PER_RUN` | `15` | Wie viele Tage pro Scheduler-Lauf abgerufen werden |
 | `FETCH_HOUR` | `3` | Uhrzeit (Stunde, 0-23) für den täglichen Abruf |
-| `SEARCH_CITY` | `Stuttgart` | Stadt für die Hotelsuche |
+| `SEARCH_CITIES` | `Stuttgart` | Städte für die Hotelsuche (komma-getrennt, z.B. `Stuttgart,München,Berlin`) |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./data/hotel_prices.db` | Datenbank-Pfad |
 
 ## Deployment auf Synology NAS

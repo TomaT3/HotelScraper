@@ -11,7 +11,7 @@ services:
       - DATABASE_URL=sqlite+aiosqlite:///./data/hotel_prices.db
       - DATES_PER_RUN=${DATES_PER_RUN:-15}
       - FETCH_HOUR=${FETCH_HOUR:-3}
-      - SEARCH_CITY=${SEARCH_CITY:-Stuttgart}
+      - SEARCH_CITIES=${SEARCH_CITIES:-Stuttgart}
     restart: unless-stopped
     logging:
       driver: json-file

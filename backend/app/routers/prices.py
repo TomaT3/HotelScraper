@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import Hotel, Price, Setting
 from app.schemas import HotelPrices, PricePoint, StatusOut, FetchResult
-from app.services.price_fetcher import fetch_prices_for_dates
+from app.services.price_fetcher import fetch_prices_for_dates, fetch_all_cities
 from app.services.scheduler import scheduler
 from app.config import settings
 
@@ -54,21 +54,46 @@ async def get_prices(
 
 
 @router.get("/status", response_model=StatusOut)
-async def get_status(db: AsyncSession = Depends(get_db)):
-    total_hotels = (await db.execute(select(func.count(Hotel.id)))).scalar() or 0
-    active_hotels = (await db.execute(
-        select(func.count(Hotel.id)).where(Hotel.active == True)
-    )).scalar() or 0
-    total_prices = (await db.execute(select(func.count(Price.id)))).scalar() or 0
+async def get_status(
+    city: str | None = Query(None, description="City to get status for"),
+    db: AsyncSession = Depends(get_db),
+):
+    # Filter by city if provided
+    hotel_filter = Hotel.city == city if city else True
+    price_join_filter = Price.hotel_id == Hotel.id
 
-    today = date.today()
-    dates_covered = (await db.execute(
-        select(func.count(func.distinct(Price.date))).where(Price.date >= today)
+    total_hotels = (await db.execute(
+        select(func.count(Hotel.id)).where(hotel_filter)
     )).scalar() or 0
+    active_hotels = (await db.execute(
+        select(func.count(Hotel.id)).where(Hotel.active == True, hotel_filter)
+    )).scalar() or 0
+
+    if city:
+        total_prices = (await db.execute(
+            select(func.count(Price.id)).where(
+                Price.hotel_id.in_(select(Hotel.id).where(Hotel.city == city))
+            )
+        )).scalar() or 0
+        today = date.today()
+        dates_covered = (await db.execute(
+            select(func.count(func.distinct(Price.date))).where(
+                Price.date >= today,
+                Price.hotel_id.in_(select(Hotel.id).where(Hotel.city == city)),
+            )
+        )).scalar() or 0
+    else:
+        total_prices = (await db.execute(select(func.count(Price.id)))).scalar() or 0
+        today = date.today()
+        dates_covered = (await db.execute(
+            select(func.count(func.distinct(Price.date))).where(Price.date >= today)
+        )).scalar() or 0
+
     dates_total = 365
 
-    # Last fetch time
-    last_fetch_result = await db.execute(select(Setting).where(Setting.key == "last_fetch"))
+    # Last fetch time (per city or global)
+    last_fetch_key = f"last_fetch:{city}" if city else "last_fetch"
+    last_fetch_result = await db.execute(select(Setting).where(Setting.key == last_fetch_key))
     last_fetch_setting = last_fetch_result.scalar_one_or_none()
     last_fetch = None
     if last_fetch_setting:
@@ -85,6 +110,7 @@ async def get_status(db: AsyncSession = Depends(get_db)):
             next_run = job.next_run_time.replace(tzinfo=None)
 
     return StatusOut(
+        city=city,
         total_hotels=total_hotels,
         active_hotels=active_hotels,
         total_prices=total_prices,
@@ -98,7 +124,14 @@ async def get_status(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/fetch", response_model=FetchResult)
-async def trigger_fetch(max_dates: int = Query(default=None)):
+async def trigger_fetch(
+    city: str | None = Query(None, description="City to fetch (all if omitted)"),
+    max_dates: int = Query(default=None),
+):
     """Manually trigger a price fetch for unfetched dates."""
-    result = await fetch_prices_for_dates(max_dates=max_dates or settings.dates_per_run)
+    md = max_dates or settings.dates_per_run
+    if city:
+        result = await fetch_prices_for_dates(city=city, max_dates=md)
+    else:
+        result = await fetch_all_cities(max_dates=md)
     return FetchResult(**result)

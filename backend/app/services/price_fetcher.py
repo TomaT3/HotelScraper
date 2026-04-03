@@ -13,34 +13,54 @@ from app.services import booking_api
 logger = logging.getLogger(__name__)
 
 
-async def get_dest_id(session: AsyncSession) -> str:
-    """Get the destination ID from DB or fetch it from the API."""
-    result = await session.execute(select(Setting).where(Setting.key == "dest_id"))
+async def get_dest_id(session: AsyncSession, city: str) -> str:
+    """Get the destination ID for a city from DB or fetch it from the API."""
+    key = f"dest_id:{city}"
+    result = await session.execute(select(Setting).where(Setting.key == key))
     setting = result.scalar_one_or_none()
     if setting:
         return setting.value
 
-    location = await booking_api.search_location(settings.search_city)
-    if not location:
-        raise RuntimeError(f"Could not find destination for city: {settings.search_city}")
+    # Fallback: check old key format (migration from single-city)
+    if city == settings.city_list[0]:
+        old_result = await session.execute(select(Setting).where(Setting.key == "dest_id"))
+        old_setting = old_result.scalar_one_or_none()
+        if old_setting:
+            # Migrate old key to new format
+            session.add(Setting(key=key, value=old_setting.value))
+            old_label = await session.execute(select(Setting).where(Setting.key == "dest_label"))
+            old_label_setting = old_label.scalar_one_or_none()
+            if old_label_setting:
+                session.add(Setting(key=f"dest_label:{city}", value=old_label_setting.value))
+            await session.commit()
+            return old_setting.value
 
-    session.add(Setting(key="dest_id", value=location["dest_id"]))
-    session.add(Setting(key="dest_label", value=location["label"]))
+    location = await booking_api.search_location(city)
+    if not location:
+        raise RuntimeError(f"Could not find destination for city: {city}")
+
+    session.add(Setting(key=key, value=location["dest_id"]))
+    session.add(Setting(key=f"dest_label:{city}", value=location["label"]))
     await session.commit()
     logger.info("Stored dest_id=%s for %s", location["dest_id"], location["label"])
     return location["dest_id"]
 
 
-async def get_unfetched_dates(session: AsyncSession, max_dates: int) -> list[date]:
-    """Find dates in the next 365 days that haven't been fetched yet.
+async def get_unfetched_dates(session: AsyncSession, city: str, max_dates: int) -> list[date]:
+    """Find dates in the next 365 days that haven't been fetched yet for a specific city.
 
     Prioritizes nearest dates first.
     """
     today = date.today()
     all_dates = {today + timedelta(days=i) for i in range(1, 366)}
 
+    # Only consider dates fetched for hotels in this city
+    city_hotel_ids = select(Hotel.id).where(Hotel.city == city)
     result = await session.execute(
-        select(Price.date).where(Price.date >= today).distinct()
+        select(Price.date).where(
+            Price.date >= today,
+            Price.hotel_id.in_(city_hotel_ids),
+        ).distinct()
     )
     fetched_dates = {row[0] for row in result.all()}
 
@@ -48,10 +68,10 @@ async def get_unfetched_dates(session: AsyncSession, max_dates: int) -> list[dat
     return unfetched[:max_dates]
 
 
-async def upsert_hotel(session: AsyncSession, hotel_data: dict) -> int:
-    """Insert or update a hotel, returning its ID."""
+async def upsert_hotel(session: AsyncSession, hotel_data: dict, city: str) -> int:
+    """Insert or update a hotel for a specific city, returning its ID."""
     result = await session.execute(
-        select(Hotel).where(Hotel.booking_id == hotel_data["booking_id"])
+        select(Hotel).where(Hotel.booking_id == hotel_data["booking_id"], Hotel.city == city)
     )
     hotel = result.scalar_one_or_none()
 
@@ -72,6 +92,7 @@ async def upsert_hotel(session: AsyncSession, hotel_data: dict) -> int:
         review_score=hotel_data.get("review_score"),
         image_url=hotel_data.get("image_url"),
         active=True,
+        city=city,
     )
     session.add(new_hotel)
     await session.flush()
@@ -93,8 +114,12 @@ async def save_price(session: AsyncSession, hotel_id: int, price_date: date, pri
     await session.execute(stmt)
 
 
-async def fetch_prices_for_dates(dates: list[date] | None = None, max_dates: int | None = None) -> dict:
-    """Fetch hotel prices for the given dates (or auto-select unfetched dates).
+async def fetch_prices_for_dates(
+    city: str,
+    dates: list[date] | None = None,
+    max_dates: int | None = None,
+) -> dict:
+    """Fetch hotel prices for a specific city for the given dates (or auto-select unfetched dates).
 
     Returns a summary dict with counts and errors.
     """
@@ -103,16 +128,16 @@ async def fetch_prices_for_dates(dates: list[date] | None = None, max_dates: int
     total_prices = 0
 
     async with async_session() as session:
-        dest_id = await get_dest_id(session)
+        dest_id = await get_dest_id(session, city)
 
         if dates is None:
-            dates = await get_unfetched_dates(session, max_dates or settings.dates_per_run)
+            dates = await get_unfetched_dates(session, city, max_dates or settings.dates_per_run)
 
         if not dates:
-            logger.info("No unfetched dates remaining — all 365 days covered!")
+            logger.info("[%s] No unfetched dates remaining — all 365 days covered!", city)
             return {"dates_fetched": 0, "hotels_found": 0, "prices_saved": 0, "errors": []}
 
-        logger.info("Fetching prices for %d dates: %s ... %s", len(dates), dates[0], dates[-1])
+        logger.info("[%s] Fetching prices for %d dates: %s ... %s", city, len(dates), dates[0], dates[-1])
 
         for check_date in dates:
             checkout = check_date + timedelta(days=1)
@@ -121,26 +146,27 @@ async def fetch_prices_for_dates(dates: list[date] | None = None, max_dates: int
                 total_hotels = max(total_hotels, len(hotels))
 
                 for hotel_data in hotels:
-                    hotel_id = await upsert_hotel(session, hotel_data)
+                    hotel_id = await upsert_hotel(session, hotel_data, city)
                     await save_price(session, hotel_id, check_date, hotel_data["price_eur"])
                     total_prices += 1
 
                 await session.commit()
-                logger.info("Saved %d prices for %s", len(hotels), check_date.isoformat())
+                logger.info("[%s] Saved %d prices for %s", city, len(hotels), check_date.isoformat())
             except Exception as e:
-                logger.error("Error fetching %s: %s", check_date.isoformat(), e)
+                logger.error("[%s] Error fetching %s: %s", city, check_date.isoformat(), e)
                 errors.append(f"{check_date.isoformat()}: {str(e)}")
                 await session.rollback()
 
-        # Update last_fetch timestamp
+        # Update last_fetch timestamp per city
         async with async_session() as s2:
-            result = await s2.execute(select(Setting).where(Setting.key == "last_fetch"))
-            setting = result.scalar_one_or_none()
             now_str = datetime.utcnow().isoformat()
-            if setting:
-                setting.value = now_str
-            else:
-                s2.add(Setting(key="last_fetch", value=now_str))
+            for key in [f"last_fetch:{city}", "last_fetch"]:
+                result = await s2.execute(select(Setting).where(Setting.key == key))
+                setting = result.scalar_one_or_none()
+                if setting:
+                    setting.value = now_str
+                else:
+                    s2.add(Setting(key=key, value=now_str))
             await s2.commit()
 
     return {
@@ -149,3 +175,24 @@ async def fetch_prices_for_dates(dates: list[date] | None = None, max_dates: int
         "prices_saved": total_prices,
         "errors": errors,
     }
+
+
+async def fetch_all_cities(
+    dates: list[date] | None = None,
+    max_dates: int | None = None,
+) -> dict:
+    """Fetch hotel prices for all configured cities sequentially.
+
+    Returns an aggregated summary dict.
+    """
+    total = {"dates_fetched": 0, "hotels_found": 0, "prices_saved": 0, "errors": []}
+
+    for city in settings.city_list:
+        logger.info("Fetching prices for city: %s", city)
+        result = await fetch_prices_for_dates(city=city, dates=dates, max_dates=max_dates)
+        total["dates_fetched"] += result["dates_fetched"]
+        total["hotels_found"] += result["hotels_found"]
+        total["prices_saved"] += result["prices_saved"]
+        total["errors"].extend(f"[{city}] {e}" for e in result["errors"])
+
+    return total
