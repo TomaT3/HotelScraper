@@ -107,6 +107,7 @@ async def search_hotels(dest_id: str, checkin: date, checkout: date) -> list[dic
         "languagecode": "en-us",
         "currency_code": "EUR",
         "page_number": "1",
+        "sort_by": "distance",
     }
 
     async with httpx.AsyncClient(timeout=60) as client:
