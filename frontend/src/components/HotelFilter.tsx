@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Hotel } from "../api/types";
 
 interface Props {
@@ -25,9 +26,13 @@ export default function HotelFilter({
   favorites,
   onToggleFavorite,
 }: Props) {
-  const filteredHotels = starFilter
-    ? hotels.filter((h) => h.stars !== null && h.stars >= starFilter)
-    : hotels;
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredHotels = hotels.filter((h) => {
+    if (starFilter !== null && (h.stars === null || h.stars < starFilter)) return false;
+    if (searchQuery && !h.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
 
   return (
     <div className="bg-white rounded-lg shadow p-4">
@@ -67,7 +72,17 @@ export default function HotelFilter({
         ))}
       </div>
 
+      {/* Search field */}
+      <input
+        type="text"
+        placeholder="Hotel suchen..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+
       {/* Hotel list */}
+
       <div className="max-h-80 overflow-y-auto space-y-1">
         {filteredHotels.length === 0 ? (
           <p className="text-sm text-gray-400 italic">Keine Hotels gefunden</p>

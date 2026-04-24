@@ -10,6 +10,10 @@ venv/
 # Node
 frontend/node_modules/
 frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+# Build artifacts (frontend outputs to backend/static/)
+backend/static/
 
 # Data
 data/
