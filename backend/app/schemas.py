@@ -10,6 +10,7 @@ class HotelOut(BaseModel):
     stars: int | None = None
     review_score: float | None = None
     image_url: str | None = None
+    distance_km: float | None = None
     active: bool
     city: str
 

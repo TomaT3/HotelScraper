@@ -81,6 +81,7 @@ async def upsert_hotel(session: AsyncSession, hotel_data: dict, city: str) -> in
         hotel.stars = hotel_data.get("stars")
         hotel.review_score = hotel_data.get("review_score")
         hotel.image_url = hotel_data.get("image_url")
+        hotel.distance_km = hotel_data.get("distance_km")
         await session.flush()
         return hotel.id
 
@@ -91,6 +92,7 @@ async def upsert_hotel(session: AsyncSession, hotel_data: dict, city: str) -> in
         stars=hotel_data.get("stars"),
         review_score=hotel_data.get("review_score"),
         image_url=hotel_data.get("image_url"),
+        distance_km=hotel_data.get("distance_km"),
         active=True,
         city=city,
     )

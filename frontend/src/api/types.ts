@@ -6,6 +6,7 @@ export interface Hotel {
   stars: number | null;
   review_score: number | null;
   image_url: string | null;
+  distance_km: number | null;
   active: boolean;
   city: string;
 }
