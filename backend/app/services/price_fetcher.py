@@ -1,7 +1,7 @@
 import logging
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.sqlite import insert as sqlite_upsert
 
@@ -46,26 +46,10 @@ async def get_dest_id(session: AsyncSession, city: str) -> str:
     return location["dest_id"]
 
 
-async def get_unfetched_dates(session: AsyncSession, city: str, max_dates: int) -> list[date]:
-    """Find dates in the next 365 days that haven't been fetched yet for a specific city.
-
-    Prioritizes nearest dates first.
-    """
+def get_next_dates(num_dates: int) -> list[date]:
+    """Generate the next N dates starting from tomorrow."""
     today = date.today()
-    all_dates = {today + timedelta(days=i) for i in range(1, 366)}
-
-    # Only consider dates fetched for hotels in this city
-    city_hotel_ids = select(Hotel.id).where(Hotel.city == city)
-    result = await session.execute(
-        select(Price.date).where(
-            Price.date >= today,
-            Price.hotel_id.in_(city_hotel_ids),
-        ).distinct()
-    )
-    fetched_dates = {row[0] for row in result.all()}
-
-    unfetched = sorted(all_dates - fetched_dates)
-    return unfetched[:max_dates]
+    return [today + timedelta(days=i) for i in range(1, num_dates + 1)]
 
 
 async def upsert_hotel(session: AsyncSession, hotel_data: dict, city: str) -> int:
@@ -121,7 +105,10 @@ async def fetch_prices_for_dates(
     dates: list[date] | None = None,
     max_dates: int | None = None,
 ) -> dict:
-    """Fetch hotel prices for a specific city for the given dates (or auto-select unfetched dates).
+    """Fetch hotel prices for a specific city for the given dates.
+
+    If no dates are provided, generates the next N dates starting from tomorrow
+    (where N = max_dates or settings.dates_per_run).
 
     Returns a summary dict with counts and errors.
     """
@@ -133,10 +120,11 @@ async def fetch_prices_for_dates(
         dest_id = await get_dest_id(session, city)
 
         if dates is None:
-            dates = await get_unfetched_dates(session, city, max_dates or settings.dates_per_run)
+            num_dates = max_dates or settings.dates_per_run
+            dates = get_next_dates(num_dates)
 
         if not dates:
-            logger.info("[%s] No unfetched dates remaining — all 365 days covered!", city)
+            logger.info("[%s] No dates to fetch.", city)
             return {"dates_fetched": 0, "hotels_found": 0, "prices_saved": 0, "errors": []}
 
         logger.info("[%s] Fetching prices for %d dates: %s ... %s", city, len(dates), dates[0], dates[-1])
