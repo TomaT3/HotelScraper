@@ -19,35 +19,40 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def migrate_add_city_column():
-    """Add 'city' column to hotels table if it doesn't exist, and backfill."""
-    default_city = settings.city_list[0]
+async def run_migrations():
+    """Run database migrations for columns added to models after initial table creation."""
     async with engine.begin() as conn:
-        # Check if column exists
         result = await conn.execute(text("PRAGMA table_info(hotels)"))
         columns = [row[1] for row in result.fetchall()]
+
+        # Migration: add 'city' column
         if "city" not in columns:
             logger.info("Migrating: adding 'city' column to hotels table...")
             await conn.execute(text("ALTER TABLE hotels ADD COLUMN city TEXT NOT NULL DEFAULT ''"))
-            await conn.execute(text("UPDATE hotels SET city = :city WHERE city = ''"), {"city": default_city})
-            # Drop old unique index on booking_id and create new one on (booking_id, city)
+            await conn.execute(text("UPDATE hotels SET city = :city WHERE city = ''"), {"city": settings.city_list[0]})
             try:
                 await conn.execute(text("DROP INDEX IF EXISTS ix_hotels_booking_id"))
             except Exception:
                 pass
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_hotels_city ON hotels (city)"))
             await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_booking_city ON hotels (booking_id, city)"))
-            logger.info("Migration complete: city column added, default='%s'", default_city)
+            logger.info("Migration complete: city column added, default='%s'", settings.city_list[0])
         else:
             # Backfill any empty city values
-            await conn.execute(text("UPDATE hotels SET city = :city WHERE city = '' OR city IS NULL"), {"city": default_city})
+            await conn.execute(text("UPDATE hotels SET city = :city WHERE city = '' OR city IS NULL"), {"city": settings.city_list[0]})
+
+        # Migration: add 'distance_km' column
+        if "distance_km" not in columns:
+            logger.info("Migrating: adding 'distance_km' column to hotels table...")
+            await conn.execute(text("ALTER TABLE hotels ADD COLUMN distance_km FLOAT"))
+            logger.info("Migration complete: distance_km column added.")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting Hotel Price Tracker...")
     await init_db()
-    await migrate_add_city_column()
+    await run_migrations()
     start_scheduler()
     yield
     stop_scheduler()
