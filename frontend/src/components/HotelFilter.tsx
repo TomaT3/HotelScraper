@@ -8,6 +8,8 @@ interface Props {
   onDeselectAll: () => void;
   starFilter: number | null;
   onStarFilterChange: (stars: number | null) => void;
+  favorites: Set<number>;
+  onToggleFavorite: (id: number) => void;
 }
 
 const STAR_OPTIONS = [null, 3, 4, 5] as const;
@@ -20,6 +22,8 @@ export default function HotelFilter({
   onDeselectAll,
   starFilter,
   onStarFilterChange,
+  favorites,
+  onToggleFavorite,
 }: Props) {
   const filteredHotels = starFilter
     ? hotels.filter((h) => h.stars !== null && h.stars >= starFilter)
@@ -79,6 +83,21 @@ export default function HotelFilter({
                 onChange={() => onToggle(hotel.id)}
                 className="rounded text-blue-600"
               />
+              {/* Favorite star */}
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  onToggleFavorite(hotel.id);
+                }}
+                className={`text-base flex-shrink-0 transition-colors ${
+                  favorites.has(hotel.id)
+                    ? "text-yellow-500 hover:text-yellow-600"
+                    : "text-gray-300 hover:text-gray-400"
+                }`}
+                title={favorites.has(hotel.id) ? "Favorit entfernen" : "Als Favorit markieren"}
+              >
+                {favorites.has(hotel.id) ? "⭐" : "☆"}
+              </button>
               <span className="truncate flex-1">{hotel.name}</span>
               {hotel.stars && (
                 <span className="text-yellow-500 text-xs flex-shrink-0">
@@ -96,6 +115,9 @@ export default function HotelFilter({
       </div>
       <div className="mt-2 text-xs text-gray-400">
         {selectedIds.size} von {filteredHotels.length} ausgewählt
+        {favorites.size > 0 && (
+          <span className="ml-2">· {favorites.size} Favoriten</span>
+        )}
       </div>
     </div>
   );

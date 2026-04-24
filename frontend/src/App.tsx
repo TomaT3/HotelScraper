@@ -8,6 +8,31 @@ import { ChevronDown } from "./components/Icons";
 import { getCities, getHotels, getPrices, getStatus, triggerFetch } from "./api/client";
 import type { City, Hotel, HotelPrices, Status, FetchResult } from "./api/types";
 
+const FAVORITES_KEY = "hotelFavorites";
+
+function loadFavorites(): Map<string, Set<number>> {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, number[]>;
+    const map = new Map<string, Set<number>>();
+    for (const [city, ids] of Object.entries(parsed)) {
+      map.set(city, new Set(ids));
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+function saveFavorites(favorites: Map<string, Set<number>>) {
+  const obj: Record<string, number[]> = {};
+  for (const [city, ids] of favorites) {
+    obj[city] = Array.from(ids);
+  }
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(obj));
+}
+
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -32,6 +57,12 @@ export default function App() {
   const [fetching, setFetching] = useState(false);
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [favorites, setFavorites] = useState<Map<string, Set<number>>>(() => loadFavorites());
+
+  // Persist favorites to localStorage whenever they change
+  useEffect(() => {
+    saveFavorites(favorites);
+  }, [favorites]);
 
   // Load cities on mount
   useEffect(() => {
@@ -64,9 +95,18 @@ export default function App() {
         if (cancelled) return;
         setHotels(h);
         setStatus(s);
-        // Auto-select all active hotels
-        const activeIds = new Set(h.filter((x) => x.active).map((x) => x.id));
-        setSelectedIds(activeIds);
+        // Auto-select favorites for this city, or fall back to all active hotels
+        const cityFavorites = favorites.get(selectedCity);
+        if (cityFavorites && cityFavorites.size > 0) {
+          // Only select favorites that still exist in the hotel list
+          const validFavorites = new Set(
+            Array.from(cityFavorites).filter((id) => h.some((hotel) => hotel.id === id))
+          );
+          setSelectedIds(validFavorites);
+        } else {
+          const activeIds = new Set(h.filter((x) => x.active).map((x) => x.id));
+          setSelectedIds(activeIds);
+        }
         setStarFilter(null);
         setFetchResult(null);
       } catch (e) {
@@ -131,6 +171,25 @@ export default function App() {
   const handleDeselectAll = useCallback(() => {
     setSelectedIds(new Set());
   }, []);
+
+  const handleToggleFavorite = useCallback((id: number) => {
+    setFavorites((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(selectedCity);
+      const cityFavorites = existing ? new Set(existing) : new Set<number>();
+      if (cityFavorites.has(id)) {
+        cityFavorites.delete(id);
+      } else {
+        cityFavorites.add(id);
+      }
+      if (cityFavorites.size > 0) {
+        next.set(selectedCity, cityFavorites);
+      } else {
+        next.delete(selectedCity);
+      }
+      return next;
+    });
+  }, [selectedCity]);
 
   const handleFetch = useCallback(async () => {
     setFetching(true);
@@ -242,6 +301,8 @@ export default function App() {
             onDeselectAll={handleDeselectAll}
             starFilter={starFilter}
             onStarFilterChange={setStarFilter}
+            favorites={favorites.get(selectedCity) ?? new Set()}
+            onToggleFavorite={handleToggleFavorite}
           />
         </div>
 
