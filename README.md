@@ -2,7 +2,7 @@
 
 Web-App die täglich Hotelpreise für Doppelzimmer in Stuttgart über die Booking.com API (RapidAPI) abruft und als interaktives Liniendiagramm darstellt.
 
-![Stack](https://img.shields.io/badge/FastAPI-Python-009688?style=flat-square) ![Stack](https://img.shields.io/badge/React-TypeScript-61DAFB?style=flat-square) ![Stack](https://img.shields.io/badge/SQLite-Database-003B57?style=flat-square) ![Stack](https://img.shields.io/badge/Docker-Deployment-2496ED?style=flat-square)
+![GitHub Release](https://img.shields.io/github/v/release/TomaT3/HotelScraper?style=flat-square&logo=github) ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/TomaT3/HotelScraper/release-and-publish.yml?style=flat-square&logo=githubactions&label=release%20build) ![Docker Pulls](https://img.shields.io/docker/pulls/tomat3/hotel-price-scraper?style=flat-square&logo=docker) ![Stack](https://img.shields.io/badge/FastAPI-Python-009688?style=flat-square) ![Stack](https://img.shields.io/badge/React-TypeScript-61DAFB?style=flat-square) ![Stack](https://img.shields.io/badge/SQLite-Database-003B57?style=flat-square) ![Stack](https://img.shields.io/badge/Docker-Deployment-2496ED?style=flat-square)
 
 ## Features
 
