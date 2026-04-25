@@ -1,6 +1,12 @@
 name: Release & Publish Docker
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.6.0)'
+        required: true
+        type: string
   push:
     tags:
       - "v*"
@@ -15,21 +21,75 @@ permissions:
   contents: write
 
 jobs:
+  bump-version:
+    name: Bump version files & create tag
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version in pyproject.toml
+        run: |
+          sed -i "s/^version = \".*\"/version = \"${{ github.event.inputs.version }}\"/" backend/pyproject.toml
+
+      - name: Bump version in main.py
+        run: |
+          sed -i "s/version=\".*\"/version=\"${{ github.event.inputs.version }}\"/" backend/app/main.py
+
+      - name: Bump version in frontend/package.json
+        run: |
+          sed -i "s/\"version\": \".*\"/\"version\": \"${{ github.event.inputs.version }}\"/" frontend/package.json
+
+      - name: Commit version bump
+        run: |
+          git add backend/pyproject.toml backend/app/main.py frontend/package.json
+          git commit -m "chore: bump version to ${{ github.event.inputs.version }}"
+          git push
+
+      - name: Create and push tag
+        run: |
+          git tag v${{ github.event.inputs.version }}
+          git push origin v${{ github.event.inputs.version }}
+
   changelog:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    needs: bump-version
+    if: |
+      always() && (
+        (github.event_name == 'workflow_dispatch' && needs.bump-version.result == 'success') ||
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+      )
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=v${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build changelog
         id: changelog
         uses: mikepenz/release-changelog-builder-action@v5
         with:
           configuration: .github/release-changelog-config.json
+          toTag: ${{ steps.tag.outputs.name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -37,16 +97,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body: ${{ steps.changelog.outputs.changelog }}
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: ${{ steps.tag.outputs.name }}
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docker:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: changelog
-    if: always() && (needs.changelog.result == 'success' || needs.changelog.result == 'skipped')
+    if: |
+      always() && (
+        needs.changelog.result == 'success' ||
+        needs.changelog.result == 'skipped'
+      )
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +122,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="v${{ github.event.inputs.version }}"
           else
             TAG="${{ github.ref_name }}"
           fi

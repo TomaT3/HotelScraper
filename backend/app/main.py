@@ -1,5 +1,6 @@
 import logging
 import os
+import tomllib
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -12,6 +13,20 @@ from app.database import init_db, engine
 from app.config import settings
 from app.routers import hotels, prices
 from app.services.scheduler import start_scheduler, stop_scheduler
+
+
+def _get_project_version() -> str:
+    """Read version from pyproject.toml, fall back to env var or 'unknown'."""
+    pyproject = Path(__file__).parent.parent / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            with open(pyproject, "rb") as f:
+                data = tomllib.load(f)
+            return data.get("project", {}).get("version", "unknown")
+        except Exception:
+            pass
+    return os.getenv("APP_VERSION", "unknown")
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,9 +77,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Hotel Price Tracker",
-    version="1.0.0",
+    version=_get_project_version(),
     lifespan=lifespan,
 )
+
 
 # API routes
 app.include_router(hotels.router)
@@ -73,7 +89,8 @@ app.include_router(prices.router)
 
 @app.get("/api/version")
 async def get_version():
-    return {"version": os.getenv("APP_VERSION", "unknown")}
+    return {"version": _get_project_version()}
+
 
 # Serve React frontend (built static files)
 STATIC_DIR = Path(__file__).parent.parent / "static"
