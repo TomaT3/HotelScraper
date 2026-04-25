@@ -16,7 +16,16 @@ from app.services.scheduler import start_scheduler, stop_scheduler
 
 
 def _get_project_version() -> str:
-    """Read version from pyproject.toml, fall back to env var or 'unknown'."""
+    """Return the app version.
+
+    Priority:
+    1. APP_VERSION env var (set via Docker build-arg, e.g. "v1.6.0")
+    2. version field from pyproject.toml (fallback for dev / local)
+    3. "unknown"
+    """
+    env_version = os.getenv("APP_VERSION")
+    if env_version and env_version != "unknown":
+        return env_version
     pyproject = Path(__file__).parent.parent / "pyproject.toml"
     if pyproject.exists():
         try:
@@ -25,7 +34,8 @@ def _get_project_version() -> str:
             return data.get("project", {}).get("version", "unknown")
         except Exception:
             pass
-    return os.getenv("APP_VERSION", "unknown")
+    return "unknown"
+
 
 
 logging.basicConfig(
