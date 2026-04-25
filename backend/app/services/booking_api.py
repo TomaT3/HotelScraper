@@ -90,11 +90,10 @@ async def search_location(city: str) -> dict | None:
     }
 
 
-async def search_hotels(dest_id: str, checkin: date, checkout: date) -> list[dict]:
-    """Search for hotels with prices for a specific date range.
-
-    Returns a list of dicts with hotel info, price, and distance from centre.
-    """
+async def _fetch_hotel_page(
+    dest_id: str, checkin: date, checkout: date, page_number: int
+) -> list[dict]:
+    """Fetch a single page of hotel search results from the API."""
     params = {
         "dest_id": dest_id,
         "search_type": "CITY",
@@ -106,7 +105,7 @@ async def search_hotels(dest_id: str, checkin: date, checkout: date) -> list[dic
         "temperature_unit": "c",
         "languagecode": "en-us",
         "currency_code": "EUR",
-        "page_number": "1",
+        "page_number": str(page_number),
         "sort_by": "distance",
     }
 
@@ -156,5 +155,33 @@ async def search_hotels(dest_id: str, checkin: date, checkout: date) -> list[dic
             logger.warning("Failed to parse hotel data: %s — %s", e, prop.get("name", "?"))
             continue
 
-    logger.info("Found %d hotels with prices for %s", len(results), checkin.isoformat())
     return results
+
+
+async def search_hotels(dest_id: str, checkin: date, checkout: date) -> list[dict]:
+    """Search for hotels with prices for a specific date range.
+
+    Fetches page 1 and page 2 of results, then deduplicates by booking_id
+    to avoid saving the same hotel twice. Returns a list of dicts with
+    hotel info, price, and distance from centre.
+    """
+    # Fetch page 1
+    page1 = await _fetch_hotel_page(dest_id, checkin, checkout, 1)
+
+    # Fetch page 2 (some hotels may appear on both pages)
+    page2 = await _fetch_hotel_page(dest_id, checkin, checkout, 2)
+
+    # Deduplicate by booking_id — keep the first occurrence
+    seen: set[str] = set()
+    combined: list[dict] = []
+    for hotel in page1 + page2:
+        bid = hotel["booking_id"]
+        if bid not in seen:
+            seen.add(bid)
+            combined.append(hotel)
+
+    logger.info(
+        "Found %d unique hotels (page1=%d, page2=%d) for %s",
+        len(combined), len(page1), len(page2), checkin.isoformat(),
+    )
+    return combined
