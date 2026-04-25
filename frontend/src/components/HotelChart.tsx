@@ -49,23 +49,6 @@ export default function HotelChart({ data, selectedIds }: Props) {
   const filtered = data.filter((h) => selectedIds.has(h.hotel_id));
   const isMany = filtered.length > 15;
 
-  // Auto-collapse legend on mobile with many hotels
-  useEffect(() => {
-    if (isMobile && isMany) setLegendOpen(false);
-    else if (!isMobile) setLegendOpen(true);
-  }, [isMobile, isMany]);
-
-  if (filtered.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-400">
-        <p className="text-lg">Keine Daten verfügbar</p>
-        <p className="text-sm mt-1">
-          Wähle Hotels aus und starte einen Abruf, um Preise zu sehen.
-        </p>
-      </div>
-    );
-  }
-
   // Merge all hotel prices into a single dataset keyed by date
   const dateMap = new Map<string, ChartDataPoint>();
 
@@ -115,6 +98,23 @@ export default function HotelChart({ data, selectedIds }: Props) {
     },
     []
   );
+
+  // Auto-collapse legend on mobile with many hotels
+  useEffect(() => {
+    if (isMobile && isMany) setLegendOpen(false);
+    else if (!isMobile) setLegendOpen(true);
+  }, [isMobile, isMany]);
+
+  if (filtered.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-400">
+        <p className="text-lg">Keine Daten verfügbar</p>
+        <p className="text-sm mt-1">
+          Wähle Hotels aus und starte einen Abruf, um Preise zu sehen.
+        </p>
+      </div>
+    );
+  }
 
   // Custom tooltip – only shown on hover, does NOT interfere with selected date
   const CustomTooltip = ({ active, payload, label }: any) => {
