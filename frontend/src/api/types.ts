@@ -47,3 +47,7 @@ export interface FetchResult {
   prices_saved: number;
   errors: string[];
 }
+
+export interface VersionInfo {
+  version: string;
+}

@@ -10,6 +10,9 @@ RUN npm run build
 # ---- Stage 2: Python backend ----
 FROM python:3.12-slim
 
+ARG VERSION=unknown
+ENV APP_VERSION=${VERSION}
+
 WORKDIR /app
 
 # Copy backend source and install

@@ -1,4 +1,4 @@
-import type { City, Hotel, HotelPrices, Status, FetchResult } from "./types";
+import type { City, Hotel, HotelPrices, Status, FetchResult, VersionInfo } from "./types";
 
 const BASE = "/api";
 
@@ -49,6 +49,10 @@ export async function getPrices(params?: {
 export async function getStatus(city?: string): Promise<Status> {
   const qs = city ? `?city=${encodeURIComponent(city)}` : "";
   return fetchJson<Status>(`${BASE}/status${qs}`);
+}
+
+export async function getVersion(): Promise<VersionInfo> {
+  return fetchJson<VersionInfo>(`${BASE}/version`);
 }
 
 export async function triggerFetch(city?: string, maxDates?: number): Promise<FetchResult> {

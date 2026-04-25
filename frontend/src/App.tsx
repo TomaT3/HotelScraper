@@ -5,7 +5,7 @@ import DateRangePicker from "./components/DateRangePicker";
 import HotelChart from "./components/HotelChart";
 import CitySelector from "./components/CitySelector";
 import { ChevronDown } from "./components/Icons";
-import { getCities, getHotels, getPrices, getStatus, triggerFetch } from "./api/client";
+import { getCities, getHotels, getPrices, getStatus, getVersion, triggerFetch } from "./api/client";
 import type { City, Hotel, HotelPrices, Status, FetchResult } from "./api/types";
 
 const FAVORITES_KEY = "hotelFavorites";
@@ -58,11 +58,25 @@ export default function App() {
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState<Map<string, Set<number>>>(() => loadFavorites());
+  const [version, setVersion] = useState<string | null>(null);
 
   // Persist favorites to localStorage whenever they change
   useEffect(() => {
     saveFavorites(favorites);
   }, [favorites]);
+
+  // Load version on mount
+  useEffect(() => {
+    async function loadVersion() {
+      try {
+        const v = await getVersion();
+        setVersion(v.version);
+      } catch {
+        // Version endpoint may not be available (e.g. dev mode)
+      }
+    }
+    loadVersion();
+  }, []);
 
   // Load cities on mount
   useEffect(() => {
@@ -315,6 +329,9 @@ export default function App() {
       {/* Footer */}
       <div className="text-center text-xs text-gray-400 pt-4">
         Daten via Booking.com (RapidAPI) · Preise für Doppelzimmer / 1 Nacht / 2 Erwachsene
+        {version && (
+          <span className="ml-2 font-mono text-gray-300">· {version}</span>
+        )}
       </div>
     </div>
   );

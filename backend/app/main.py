@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -68,6 +69,11 @@ app = FastAPI(
 # API routes
 app.include_router(hotels.router)
 app.include_router(prices.router)
+
+
+@app.get("/api/version")
+async def get_version():
+    return {"version": os.getenv("APP_VERSION", "unknown")}
 
 # Serve React frontend (built static files)
 STATIC_DIR = Path(__file__).parent.parent / "static"
