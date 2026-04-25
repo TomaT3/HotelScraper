@@ -1,4 +1,4 @@
-import type { City, Hotel, HotelPrices, Status, FetchResult, VersionInfo } from "./types";
+import type { City, ConfigResponse, Hotel, HotelPrices, Status, FetchResult, VersionInfo } from "./types";
 
 const BASE = "/api";
 
@@ -53,6 +53,10 @@ export async function getStatus(city?: string): Promise<Status> {
 
 export async function getVersion(): Promise<VersionInfo> {
   return fetchJson<VersionInfo>(`${BASE}/version`);
+}
+
+export async function getConfig(): Promise<ConfigResponse> {
+  return fetchJson<ConfigResponse>(`${BASE}/config`);
 }
 
 export async function triggerFetch(city?: string, maxDates?: number): Promise<FetchResult> {

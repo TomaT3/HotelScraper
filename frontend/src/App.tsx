@@ -5,7 +5,7 @@ import DateRangePicker from "./components/DateRangePicker";
 import HotelChart from "./components/HotelChart";
 import CitySelector from "./components/CitySelector";
 import { ChevronDown } from "./components/Icons";
-import { getCities, getHotels, getPrices, getStatus, getVersion, triggerFetch } from "./api/client";
+import { getCities, getHotels, getPrices, getStatus, getVersion, getConfig, triggerFetch } from "./api/client";
 import type { City, Hotel, HotelPrices, Status, FetchResult } from "./api/types";
 
 const FAVORITES_KEY = "hotelFavorites";
@@ -37,9 +37,9 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function yearLaterStr(): string {
+function datesPerRunEndStr(datesPerRun: number): string {
   const d = new Date();
-  d.setFullYear(d.getFullYear() + 1);
+  d.setDate(d.getDate() + datesPerRun - 1);
   return d.toISOString().slice(0, 10);
 }
 
@@ -51,8 +51,9 @@ export default function App() {
   const [status, setStatus] = useState<Status | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [starFilter, setStarFilter] = useState<number | null>(null);
+  const [datesPerRun, setDatesPerRun] = useState<number>(15);
   const [dateFrom, setDateFrom] = useState(todayStr());
-  const [dateTo, setDateTo] = useState(yearLaterStr());
+  const [dateTo, setDateTo] = useState(datesPerRunEndStr(15));
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
@@ -65,17 +66,22 @@ export default function App() {
     saveFavorites(favorites);
   }, [favorites]);
 
-  // Load version on mount
+  // Load version and config on mount
   useEffect(() => {
-    async function loadVersion() {
+    async function load() {
       try {
-        const v = await getVersion();
+        const [v, cfg] = await Promise.all([
+          getVersion(),
+          getConfig(),
+        ]);
         setVersion(v.version);
+        setDatesPerRun(cfg.dates_per_run);
+        setDateTo(datesPerRunEndStr(cfg.dates_per_run));
       } catch {
-        // Version endpoint may not be available (e.g. dev mode)
+        // Version/config endpoints may not be available (e.g. dev mode)
       }
     }
-    loadVersion();
+    load();
   }, []);
 
   // Load cities on mount

@@ -51,3 +51,7 @@ export interface FetchResult {
 export interface VersionInfo {
   version: string;
 }
+
+export interface ConfigResponse {
+  dates_per_run: number;
+}

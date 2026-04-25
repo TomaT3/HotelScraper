@@ -102,6 +102,11 @@ async def get_version():
     return {"version": _get_project_version()}
 
 
+@app.get("/api/config")
+async def get_config():
+    return {"dates_per_run": settings.dates_per_run}
+
+
 # Serve React frontend (built static files)
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
