@@ -89,7 +89,7 @@ async def get_status(
             select(func.count(func.distinct(Price.date))).where(Price.date >= today)
         )).scalar() or 0
 
-    dates_total = 365
+    dates_total = settings.dates_per_run
 
     # Last fetch time (per city or global)
     last_fetch_key = f"last_fetch:{city}" if city else "last_fetch"
