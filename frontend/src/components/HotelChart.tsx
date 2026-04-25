@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -7,6 +7,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
 } from "recharts";
 import type { HotelPrices } from "../api/types";
 
@@ -40,6 +41,7 @@ function useWindowWidth() {
 
 export default function HotelChart({ data, selectedIds }: Props) {
   const [hoveredHotel, setHoveredHotel] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(true);
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
@@ -86,7 +88,35 @@ export default function HotelChart({ data, selectedIds }: Props) {
     return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
   };
 
-  // Custom tooltip – when hovering a legend item, show only that hotel
+  // Build a lookup: for a given date, get all hotel prices
+  const getPricesForDate = useCallback(
+    (dateStr: string) => {
+      const point = dateMap.get(dateStr);
+      if (!point) return [];
+      return filtered
+        .map((hotel) => ({
+          hotel_name: hotel.hotel_name,
+          stars: hotel.stars,
+          price: point[hotel.hotel_name] as number | undefined,
+          color: COLORS[filtered.indexOf(hotel) % COLORS.length],
+        }))
+        .filter((h) => h.price !== undefined)
+        .sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+    },
+    [filtered, dateMap]
+  );
+
+  // Handle click on chart – select the clicked date
+  const handleChartClick = useCallback(
+    (data: any) => {
+      if (data?.activeLabel) {
+        setSelectedDate(data.activeLabel);
+      }
+    },
+    []
+  );
+
+  // Custom tooltip – only shown on hover, does NOT interfere with selected date
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
 
@@ -95,7 +125,7 @@ export default function HotelChart({ data, selectedIds }: Props) {
       : payload.sort((a: any, b: any) => (a.value ?? 0) - (b.value ?? 0));
 
     return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm max-w-xs max-h-60 overflow-y-auto">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm max-w-xs">
         <p className="font-semibold mb-1">
           {new Date(label + "T00:00:00").toLocaleDateString("de-DE", {
             weekday: "short",
@@ -104,67 +134,144 @@ export default function HotelChart({ data, selectedIds }: Props) {
             year: "numeric",
           })}
         </p>
-        {items.map((entry: any, i: number) => (
-          <div key={i} className="flex justify-between gap-4">
-            <span style={{ color: entry.color }} className="truncate">
-              {entry.name}
-            </span>
-            <span className="font-medium">{entry.value?.toFixed(0)} €</span>
-          </div>
-        ))}
+        {items.length > 5 ? (
+          <p className="text-gray-400 text-xs italic">
+            {items.length} Hotels · Klicke für Details
+          </p>
+        ) : (
+          items.map((entry: any, i: number) => (
+            <div key={i} className="flex justify-between gap-4">
+              <span style={{ color: entry.color }} className="truncate">
+                {entry.name}
+              </span>
+              <span className="font-medium">{entry.value?.toFixed(0)} €</span>
+            </div>
+          ))
+        )}
       </div>
     );
   };
 
   const chartHeight = isMobile ? 300 : isMany ? 450 : 500;
 
+  // Build the selected-date panel data
+  const selectedDatePrices = selectedDate ? getPricesForDate(selectedDate) : [];
+
   return (
     <div className="bg-white rounded-lg shadow p-2 sm:p-4">
       <h3 className="font-semibold text-gray-700 mb-2 sm:mb-4 text-sm sm:text-base">
         Preisverlauf — Doppelzimmer / Nacht
       </h3>
-      <ResponsiveContainer width="100%" height={chartHeight}>
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis
-            dataKey="date"
-            tickFormatter={formatDate}
-            tick={{ fontSize: isMobile ? 9 : 11 }}
-            interval="preserveStartEnd"
-            minTickGap={isMobile ? 30 : 40}
-          />
-          <YAxis
-            tick={{ fontSize: isMobile ? 9 : 11 }}
-            tickFormatter={(v) => `${v} €`}
-            width={isMobile ? 50 : 70}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          {filtered.map((hotel, i) => (
-            <Line
-              key={hotel.hotel_id}
-              type="monotone"
-              dataKey={hotel.hotel_name}
-              stroke={COLORS[i % COLORS.length]}
-              strokeWidth={
-                hoveredHotel === hotel.hotel_name ? 3 : isMany ? 1.5 : 2
-              }
-              strokeOpacity={
-                hoveredHotel
-                  ? hoveredHotel === hotel.hotel_name
-                    ? 1
-                    : 0.1
-                  : isMany
-                  ? 0.5
-                  : 1
-              }
-              dot={false}
-              connectNulls
-              activeDot={{ r: hoveredHotel === hotel.hotel_name ? 6 : 4 }}
-              isAnimationActive={false}
-            />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Chart */}
+        <div className="flex-1 min-w-0">
+          <ResponsiveContainer width="100%" height={chartHeight}>
+            <LineChart
+              data={chartData}
+              onClick={handleChartClick}
+              style={{ cursor: "pointer" }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatDate}
+                tick={{ fontSize: isMobile ? 9 : 11 }}
+                interval="preserveStartEnd"
+                minTickGap={isMobile ? 30 : 40}
+              />
+              <YAxis
+                tick={{ fontSize: isMobile ? 9 : 11 }}
+                tickFormatter={(v) => `${v} €`}
+                width={isMobile ? 50 : 70}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              {selectedDate && (
+                <ReferenceLine
+                  x={selectedDate}
+                  stroke="#666"
+                  strokeDasharray="4 4"
+                  strokeWidth={1.5}
+                />
+              )}
+              {filtered.map((hotel, i) => (
+                <Line
+                  key={hotel.hotel_id}
+                  type="monotone"
+                  dataKey={hotel.hotel_name}
+                  stroke={COLORS[i % COLORS.length]}
+                  strokeWidth={
+                    hoveredHotel === hotel.hotel_name ? 3 : isMany ? 1.5 : 2
+                  }
+                  strokeOpacity={
+                    hoveredHotel
+                      ? hoveredHotel === hotel.hotel_name
+                        ? 1
+                        : 0.1
+                      : isMany
+                      ? 0.5
+                      : 1
+                  }
+                  dot={false}
+                  connectNulls
+                  activeDot={{ r: hoveredHotel === hotel.hotel_name ? 6 : 4 }}
+                  isAnimationActive={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Selected date panel */}
+        {selectedDate && selectedDatePrices.length > 0 && (
+          <div className="lg:w-72 flex-shrink-0 border border-gray-200 rounded-lg bg-gray-50 p-3 max-h-[500px] flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold text-sm text-gray-700">
+                {new Date(selectedDate + "T00:00:00").toLocaleDateString("de-DE", {
+                  weekday: "short",
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </h4>
+              <button
+                onClick={() => setSelectedDate(null)}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                title="Auswahl aufheben"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 space-y-1 text-sm">
+              {selectedDatePrices.map((h, i) => (
+                <div
+                  key={i}
+                  className="flex justify-between items-center gap-2 px-2 py-1 rounded hover:bg-white"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span
+                      className="inline-block w-2.5 h-0.5 flex-shrink-0 rounded"
+                      style={{ backgroundColor: h.color }}
+                    />
+                    <span className="truncate text-gray-700">{h.hotel_name}</span>
+                    {h.stars && (
+                      <span className="text-yellow-500 text-xs flex-shrink-0">
+                        {"★".repeat(h.stars)}
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-medium text-gray-900 flex-shrink-0">
+                    {h.price?.toFixed(0)} €
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-200 text-center">
+              {selectedDatePrices.length} Hotels
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Custom interactive legend */}
       <div className="mt-2 border-t pt-2">
