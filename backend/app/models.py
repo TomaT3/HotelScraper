@@ -14,6 +14,7 @@ class Hotel(Base):
     stars: Mapped[int | None] = mapped_column(Integer, nullable=True)
     review_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     city: Mapped[str] = mapped_column(String, index=True, default="")
 
