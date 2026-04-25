@@ -1,6 +1,6 @@
 [project]
 name = "hotel-scraper"
-version = "1.0.0"
+version = "1.6.0"
 description = "Stuttgart Hotel Price Tracker - Fetches daily hotel prices via RapidAPI Booking.com"
 requires-python = ">=3.11"
 dependencies = [
