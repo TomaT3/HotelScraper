@@ -5,8 +5,8 @@ import DateRangePicker from "./components/DateRangePicker";
 import HotelChart from "./components/HotelChart";
 import CitySelector from "./components/CitySelector";
 import { ChevronDown } from "./components/Icons";
-import { getCities, getHotels, getPrices, getStatus, getVersion, getConfig, triggerFetch } from "./api/client";
-import type { City, Hotel, HotelPrices, Status, FetchResult } from "./api/types";
+import { getCities, getHotels, getPrices, getStatus, getVersion, getConfig } from "./api/client";
+import type { City, Hotel, HotelPrices, Status } from "./api/types";
 
 const FAVORITES_KEY = "hotelFavorites";
 
@@ -55,8 +55,6 @@ export default function App() {
   const [dateFrom, setDateFrom] = useState(todayStr());
   const [dateTo, setDateTo] = useState(datesPerRunEndStr(15));
   const [loading, setLoading] = useState(true);
-  const [fetching, setFetching] = useState(false);
-  const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState<Map<string, Set<number>>>(() => loadFavorites());
   const [version, setVersion] = useState<string | null>(null);
@@ -128,7 +126,6 @@ export default function App() {
           setSelectedIds(activeIds);
         }
         setStarFilter(null);
-        setFetchResult(null);
       } catch (e) {
         console.error("Failed to load data for city:", e);
       } finally {
@@ -211,30 +208,6 @@ export default function App() {
     });
   }, [selectedCity]);
 
-  const handleFetch = useCallback(async () => {
-    setFetching(true);
-    setFetchResult(null);
-    try {
-      const result = await triggerFetch(selectedCity || undefined);
-      setFetchResult(result);
-      // Reload data for current city
-      if (selectedCity) {
-        const [h, s] = await Promise.all([
-          getHotels(selectedCity),
-          getStatus(selectedCity),
-        ]);
-        setHotels(h);
-        setStatus(s);
-        const activeIds = new Set(h.filter((x) => x.active).map((x) => x.id));
-        setSelectedIds(activeIds);
-      }
-    } catch (e) {
-      console.error("Fetch failed:", e);
-    } finally {
-      setFetching(false);
-    }
-  }, [selectedCity]);
-
   const handleDateChange = useCallback((from: string, to: string) => {
     setDateFrom(from);
     setDateTo(to);
@@ -258,36 +231,7 @@ export default function App() {
       <StatusBar
         status={status}
         loading={loading}
-        onFetch={handleFetch}
-        fetching={fetching}
       />
-
-      {/* Fetch result notification */}
-      {fetchResult && (
-        <div
-          className={`rounded-lg p-3 text-sm ${
-            fetchResult.errors.length > 0
-              ? "bg-yellow-50 text-yellow-800 border border-yellow-200"
-              : "bg-green-50 text-green-800 border border-green-200"
-          }`}
-        >
-          <span className="font-medium">Abruf abgeschlossen:</span>{" "}
-          {fetchResult.dates_fetched} Tage, {fetchResult.prices_saved} Preise
-          gespeichert, {fetchResult.hotels_found} Hotels gefunden.
-          {fetchResult.errors.length > 0 && (
-            <details className="mt-1">
-              <summary className="cursor-pointer text-yellow-600">
-                {fetchResult.errors.length} Fehler anzeigen
-              </summary>
-              <ul className="mt-1 list-disc list-inside">
-                {fetchResult.errors.map((e, i) => (
-                  <li key={i}>{e}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      )}
 
       {/* Filters + Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
