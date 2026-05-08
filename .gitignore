@@ -17,6 +17,7 @@ backend/static/
 
 # Data
 data/
+!backend/tests/data/
 *.db
 
 # Environment
