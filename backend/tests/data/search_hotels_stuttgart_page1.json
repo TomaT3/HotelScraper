@@ -1,0 +1,51 @@
+{
+    "data": {
+        "hotels": [
+            {
+                "accessibilityLabel": "0.5 miles from centre",
+                "property": {
+                    "id": 1001,
+                    "name": "Stuttgart Grand Hotel",
+                    "accuratePropertyClass": 5,
+                    "reviewScore": 8.7,
+                    "photoUrls": ["https://example.com/photos/grand1.jpg"],
+                    "priceBreakdown": {
+                        "grossPrice": {
+                            "value": 185.50
+                        }
+                    }
+                }
+            },
+            {
+                "accessibilityLabel": "In city centre",
+                "property": {
+                    "id": 1002,
+                    "name": "City Center Inn",
+                    "accuratePropertyClass": 3,
+                    "reviewScore": 7.4,
+                    "photoUrls": ["https://example.com/photos/cityinn1.jpg"],
+                    "priceBreakdown": {
+                        "grossPrice": {
+                            "value": 89.00
+                        }
+                    }
+                }
+            },
+            {
+                "accessibilityLabel": "2.1 miles from centre",
+                "property": {
+                    "id": 1003,
+                    "name": "Suburban Lodge",
+                    "accuratePropertyClass": 4,
+                    "reviewScore": 8.2,
+                    "photoUrls": [],
+                    "priceBreakdown": {
+                        "grossPrice": {
+                            "value": 112.00
+                        }
+                    }
+                }
+            }
+        ]
+    }
+}
