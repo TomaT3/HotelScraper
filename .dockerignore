@@ -3,3 +3,21 @@ frontend/dist/
 
 # Frontend build inside backend
 backend/static/
+wwwroot/
+
+# .NET build artifacts
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+
+# Python virtual environment
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.egg-info/
+
+# IDE
+.idea/
+.vscode/

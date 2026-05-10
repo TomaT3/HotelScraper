@@ -37,13 +37,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Bump version in pyproject.toml
+      - name: Bump version in HotelScraper.Api.csproj
         run: |
-          sed -i "s/^version = \".*\"/version = \"${{ github.event.inputs.version }}\"/" backend/pyproject.toml
-
-      - name: Bump version in main.py
-        run: |
-          sed -i "s/version=\".*\"/version=\"${{ github.event.inputs.version }}\"/" backend/app/main.py
+          sed -i "s|<Version>.*</Version>|<Version>${{ github.event.inputs.version }}</Version>|" src/HotelScraper.Api/HotelScraper.Api.csproj
 
       - name: Bump version in frontend/package.json
         run: |
@@ -51,7 +47,7 @@ jobs:
 
       - name: Commit version bump
         run: |
-          git add backend/pyproject.toml backend/app/main.py frontend/package.json
+          git add src/HotelScraper.Api/HotelScraper.Api.csproj frontend/package.json
           git commit -m "chore: bump version to ${{ github.event.inputs.version }}"
           git push
 

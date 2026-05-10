@@ -7,21 +7,32 @@ COPY frontend/ ./
 ENV BUILD_OUTDIR=dist
 RUN npm run build
 
-# ---- Stage 2: Python backend ----
-FROM python:3.12-slim
+# ---- Stage 2: Build .NET backend ----
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
+ARG VERSION=unknown
+WORKDIR /src
+
+# Restore dependencies
+COPY src/HotelScraper.Api/HotelScraper.Api.csproj ./src/HotelScraper.Api/
+RUN dotnet restore src/HotelScraper.Api/HotelScraper.Api.csproj
+
+# Copy source and publish
+COPY src/ ./src/
+RUN dotnet publish src/HotelScraper.Api/HotelScraper.Api.csproj -c Release -o /app /p:Version=${VERSION}
+
+# ---- Stage 3: Runtime ----
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 
 ARG VERSION=unknown
 ENV APP_VERSION=${VERSION}
 
 WORKDIR /app
 
-# Copy backend source and install
-COPY backend/pyproject.toml ./
-COPY backend/app/ ./app/
-RUN pip install --no-cache-dir .
+# Copy published .NET app
+COPY --from=backend-build /app ./
 
-# Copy built frontend from stage 1
-COPY --from=frontend-build /build/dist ./static/
+# Copy built frontend from stage 1 → wwwroot
+COPY --from=frontend-build /build/dist ./wwwroot/
 
 # Create data directory
 RUN mkdir -p /app/data
@@ -32,4 +43,5 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENV ASPNETCORE_URLS=http://0.0.0.0:8000
+ENTRYPOINT ["dotnet", "HotelScraper.Api.dll"]
