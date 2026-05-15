@@ -7,11 +7,11 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      - RAPIDAPI_KEY=${RAPIDAPI_KEY}
+      - Scraper__RapidApiKey=${RAPIDAPI_KEY}
       - Scraper__DatabaseUrl=Data Source=data/hotel_prices.db
       - Scraper__DatesPerRun=${DATES_PER_RUN:-15}
       - Scraper__FetchHour=${FETCH_HOUR:-3}
-      - Scraper__SearchCities=${SEARCH_CITIES:-Stuttgart}
+      - Scraper__SearchCities=Stuttgart,Tübingen
     restart: unless-stopped
     logging:
       driver: json-file

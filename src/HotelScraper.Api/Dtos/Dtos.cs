@@ -1,59 +1,65 @@
+using System.Text.Json.Serialization;
+
 namespace HotelScraper.Api.Dtos;
 
 public record HotelOut(
-    int Id,
-    string BookingId,
-    string Name,
-    string? Address,
-    int? Stars,
-    double? ReviewScore,
-    string? ImageUrl,
-    double? DistanceKm,
-    bool Active,
-    string City
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("booking_id")] string BookingId,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("address")] string? Address,
+    [property: JsonPropertyName("stars")] int? Stars,
+    [property: JsonPropertyName("review_score")] double? ReviewScore,
+    [property: JsonPropertyName("image_url")] string? ImageUrl,
+    [property: JsonPropertyName("distance_km")] double? DistanceKm,
+    [property: JsonPropertyName("active")] bool Active,
+    [property: JsonPropertyName("city")] string City
 );
 
 public record CityOut(
-    string Name,
-    string? DestLabel
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("dest_label")] string? DestLabel
 );
 
 public record HotelUpdate(
-    bool? Active
+    [property: JsonPropertyName("active")] bool? Active
 );
 
 public record PricePoint(
-    DateOnly Date,
-    double PriceEur
+    [property: JsonPropertyName("date")] DateOnly Date,
+    [property: JsonPropertyName("price_eur")] double PriceEur
 );
 
 public record HotelPrices(
-    int HotelId,
-    string HotelName,
-    int? Stars,
-    List<PricePoint> Prices
+    [property: JsonPropertyName("hotel_id")] int HotelId,
+    [property: JsonPropertyName("hotel_name")] string HotelName,
+    [property: JsonPropertyName("stars")] int? Stars,
+    [property: JsonPropertyName("prices")] List<PricePoint> Prices
 );
 
 public record StatusOut(
-    string? City,
-    int TotalHotels,
-    int ActiveHotels,
-    int TotalPrices,
-    int DatesCovered,
-    int DatesTotal,
-    double CoveragePct,
-    DateTime? LastFetch,
-    bool SchedulerRunning,
-    DateTime? NextRun
+    [property: JsonPropertyName("city")] string? City,
+    [property: JsonPropertyName("total_hotels")] int TotalHotels,
+    [property: JsonPropertyName("active_hotels")] int ActiveHotels,
+    [property: JsonPropertyName("total_prices")] int TotalPrices,
+    [property: JsonPropertyName("dates_covered")] int DatesCovered,
+    [property: JsonPropertyName("dates_total")] int DatesTotal,
+    [property: JsonPropertyName("coverage_pct")] double CoveragePct,
+    [property: JsonPropertyName("last_fetch")] DateTime? LastFetch,
+    [property: JsonPropertyName("scheduler_running")] bool SchedulerRunning,
+    [property: JsonPropertyName("next_run")] DateTime? NextRun
 );
 
 public record FetchResult(
-    int DatesFetched,
-    int HotelsFound,
-    int PricesSaved,
-    List<string> Errors
+    [property: JsonPropertyName("dates_fetched")] int DatesFetched,
+    [property: JsonPropertyName("hotels_found")] int HotelsFound,
+    [property: JsonPropertyName("prices_saved")] int PricesSaved,
+    [property: JsonPropertyName("errors")] List<string> Errors
 );
 
-public record VersionInfo(string Version);
+public record VersionInfo(
+    [property: JsonPropertyName("version")] string Version
+);
 
-public record ConfigResponse(int DatesPerRun);
+public record ConfigResponse(
+    [property: JsonPropertyName("dates_per_run")] int DatesPerRun
+);

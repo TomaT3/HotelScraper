@@ -3,6 +3,7 @@ using HotelScraper.Api.Data;
 using HotelScraper.Api.Endpoints;
 using HotelScraper.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Quartz;
 
@@ -70,16 +71,22 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-// Serve React frontend static files
-var staticDir = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+// Serve React frontend static files — search multiple possible locations
+var staticDir = FindStaticDir(app.Environment.ContentRootPath);
 
-if (Directory.Exists(staticDir))
+if (staticDir is not null)
 {
     app.UseDefaultFiles();
-    app.UseStaticFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(staticDir)
+    });
 
     // SPA fallback: serve index.html for non-API routes
-    app.MapFallbackToFile("index.html");
+    app.MapFallbackToFile("index.html", new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(staticDir)
+    });
 }
 else
 {
@@ -97,12 +104,34 @@ app.Run();
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
+static string? FindStaticDir(string contentRoot)
+{
+    // Priority: wwwroot/ (publish target), backend/static/ (Vite default output), frontend/dist/
+    var candidates = new[]
+    {
+        Path.Combine(contentRoot, "wwwroot"),
+        Path.Combine(contentRoot, "..", "..", "..", "..", "backend", "static"),
+        Path.Combine(contentRoot, "..", "..", "..", "..", "frontend", "dist"),
+    };
+
+    foreach (var dir in candidates)
+    {
+        var full = Path.GetFullPath(dir);
+        if (Directory.Exists(full) && File.Exists(Path.Combine(full, "index.html")))
+            return full;
+    }
+
+    return null;
+}
+
 static string ResolveDbPath(string databaseUrl)
 {
     // Convert Python-style "sqlite+aiosqlite:///./data/hotel_prices.db" → full path
+    // Also strip "Data Source=" prefix if present (from connection-string-style config)
     var path = databaseUrl
         .Replace("sqlite+aiosqlite:///", "")
-        .Replace("sqlite:///", "");
+        .Replace("sqlite:///", "")
+        .Replace("Data Source=", "");
 
     if (path.StartsWith("./"))
         path = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), path));

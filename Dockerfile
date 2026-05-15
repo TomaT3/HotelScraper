@@ -9,7 +9,7 @@ RUN npm run build
 
 # ---- Stage 2: Build .NET backend ----
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
-ARG VERSION=unknown
+ARG VERSION=0.0.0
 WORKDIR /src
 
 # Restore dependencies
@@ -23,7 +23,7 @@ RUN dotnet publish src/HotelScraper.Api/HotelScraper.Api.csproj -c Release -o /a
 # ---- Stage 3: Runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 
-ARG VERSION=unknown
+ARG VERSION=0.0.0
 ENV APP_VERSION=${VERSION}
 
 WORKDIR /app

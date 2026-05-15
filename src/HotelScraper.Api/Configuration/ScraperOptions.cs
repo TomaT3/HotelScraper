@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace HotelScraper.Api.Configuration;
 
 public class ScraperOptions
@@ -9,21 +11,20 @@ public class ScraperOptions
     public int DatesPerRun { get; set; } = 15;
     public int FetchHour { get; set; } = 3;
     public string SearchCities { get; set; } = "Stuttgart";
-    public string SearchCity { get; set; } = "";
+
 
     public List<string> CityList
     {
         get
         {
-            var cities = SearchCities
+            var rawCities = SearchCities
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(c => c.Length > 0)
                 .ToList();
 
-            if (cities.Count == 0 && !string.IsNullOrWhiteSpace(SearchCity))
-                cities = [SearchCity.Trim()];
+            var cities = rawCities.Count > 0 ? rawCities : ["Stuttgart"];
 
-            return cities.Count > 0 ? cities : ["Stuttgart"];
+            return cities;
         }
     }
 }
