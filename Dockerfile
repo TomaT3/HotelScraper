@@ -13,12 +13,12 @@ ARG VERSION=0.0.0
 WORKDIR /src
 
 # Restore dependencies
-COPY src/HotelScraper.Api/HotelScraper.Api.csproj ./src/HotelScraper.Api/
-RUN dotnet restore src/HotelScraper.Api/HotelScraper.Api.csproj
+COPY backend/src/HotelScraper.Api/HotelScraper.Api.csproj ./backend/src/HotelScraper.Api/
+RUN dotnet restore backend/src/HotelScraper.Api/HotelScraper.Api.csproj
 
 # Copy source and publish
-COPY src/ ./src/
-RUN dotnet publish src/HotelScraper.Api/HotelScraper.Api.csproj -c Release -o /app /p:Version=${VERSION}
+COPY backend/src/ ./backend/src/
+RUN dotnet publish backend/src/HotelScraper.Api/HotelScraper.Api.csproj -c Release -o /app /p:Version=${VERSION}
 
 # ---- Stage 3: Runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0

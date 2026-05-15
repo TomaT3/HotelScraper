@@ -39,7 +39,7 @@ jobs:
 
       - name: Bump version in HotelScraper.Api.csproj
         run: |
-          sed -i "s|<Version>.*</Version>|<Version>${{ github.event.inputs.version }}</Version>|" src/HotelScraper.Api/HotelScraper.Api.csproj
+          sed -i "s|<Version>.*</Version>|<Version>${{ github.event.inputs.version }}</Version>|" backend/src/HotelScraper.Api/HotelScraper.Api.csproj
 
       - name: Bump version in frontend/package.json
         run: |
@@ -47,7 +47,7 @@ jobs:
 
       - name: Commit version bump
         run: |
-          git add src/HotelScraper.Api/HotelScraper.Api.csproj frontend/package.json
+          git add backend/src/HotelScraper.Api/HotelScraper.Api.csproj frontend/package.json
           git commit -m "chore: bump version to ${{ github.event.inputs.version }}"
           git push
 

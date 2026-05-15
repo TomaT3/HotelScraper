@@ -5,8 +5,8 @@ namespace HotelScraper.Tests;
 public static class TestFixtureLoader
 {
     private static readonly string DataDir = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..",
-        "backend", "tests", "data"
+        AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..",
+        "data"
     );
 
     public static T LoadFixture<T>(string filename)

@@ -1,7 +1,7 @@
-using System.Net.Http.Json;
 using HotelScraper.Api;
 using HotelScraper.Api.Configuration;
 using HotelScraper.Api.Data;
+using HotelScraper.Api.Dtos;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -9,6 +9,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 using Xunit;
 
 namespace HotelScraper.Tests;
@@ -294,13 +296,38 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
 
     // ── Response type records ─────────────────────────────────────────
 
-    private record VersionResponse(string Version);
-    private record ConfigResponse(int DatesPerRun);
-    private record CityResponse(string Name, string? DestLabel);
-    private record HotelResponse(int Id, string BookingId, string Name, bool Active, string City);
-    private record HotelPricesResponse(int HotelId, string HotelName, List<PricePointResponse> Prices);
-    private record PricePointResponse(string Date, double PriceEur);
+    private record VersionResponse([property: JsonPropertyName("version")] string Version);
+    private record ConfigResponse([property: JsonPropertyName("dates_per_run")] int DatesPerRun);
+    private record CityResponse(
+        [property: JsonPropertyName("name")] string Name, 
+        [property: JsonPropertyName("dest_label")] string? DestLabel
+    );
+    private record HotelResponse(
+        [property: JsonPropertyName("id")] int Id,
+        [property: JsonPropertyName("booking_id")] string BookingId,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("address")] string? Address,
+        [property: JsonPropertyName("stars")] int? Stars,
+        [property: JsonPropertyName("review_score")] double? ReviewScore,
+        [property: JsonPropertyName("image_url")] string? ImageUrl,
+        [property: JsonPropertyName("distance_km")] double? DistanceKm,
+        [property: JsonPropertyName("active")] bool Active,
+        [property: JsonPropertyName("city")] string City);
+    private record HotelPricesResponse(
+        [property: JsonPropertyName("hotel_id")] int HotelId,
+        [property: JsonPropertyName("hotel_name")] string HotelName,
+        [property: JsonPropertyName("stars")] int? Stars,
+        [property: JsonPropertyName("prices")] List<PricePointResponse> Prices);
+    private record PricePointResponse(
+        [property: JsonPropertyName("date")] string Date,
+    [property: JsonPropertyName("price_eur")] double PriceEur);
     private record StatusResponse(
-        string? City, int TotalHotels, int ActiveHotels, int TotalPrices,
-        int DatesCovered, double CoveragePct);
+        [property: JsonPropertyName("city")] string? City,
+        [property: JsonPropertyName("total_hotels")] int TotalHotels,
+        [property: JsonPropertyName("active_hotels")] int ActiveHotels,
+        [property: JsonPropertyName("total_prices")] int TotalPrices,
+        [property: JsonPropertyName("dates_covered")] int DatesCovered,
+        [property: JsonPropertyName("dates_total")] int DatesTotal,
+        [property: JsonPropertyName("coverage_pct")] double CoveragePct
+    );
 }
