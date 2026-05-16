@@ -226,22 +226,27 @@ static async Task RunMigrationsAsync(AppDbContext db, ScraperOptions options)
             }
         }
 
-        // Ensure the unique index is on (hotel_id, date, room_type), not the old (hotel_id, date).
-        // This runs every startup to fix databases that were partially migrated or
-        // created with an older model that had a 2-column unique constraint.
-        // First, discover any 2-column unique index on prices (regardless of its name).
+        // Ensure the unique constraint is on (hotel_id, date, room_type), not the old (hotel_id, date).
+        // This runs every startup to fix databases created with an older model.
+        // Inline UNIQUE constraints (sqlite_autoindex_*) require a table rebuild;
+        // regular unique indexes can be dropped directly.
         cmd.CommandText = "PRAGMA index_list(prices)";
         using var idxListReader = await cmd.ExecuteReaderAsync();
-        var indexNames = new List<(string Name, bool IsUnique)>();
+        var uniqueIndexes = new List<(string Name, bool IsAuto)>();
         while (await idxListReader.ReadAsync())
-            indexNames.Add((idxListReader.GetString(1), idxListReader.GetInt32(2) == 1));
+        {
+            var idxName = idxListReader.GetString(1);
+            var isUnique = idxListReader.GetInt32(2) == 1;
+            if (isUnique)
+                uniqueIndexes.Add((idxName, idxName.StartsWith("sqlite_autoindex_", StringComparison.Ordinal)));
+        }
         await idxListReader.DisposeAsync();
 
-        var indexesToDrop = new List<string>();
-        foreach (var (idxName, isUnique) in indexNames)
-        {
-            if (!isUnique) continue;
+        var oldAutoIndex = (string?)null;
+        var oldRegularIndexes = new List<string>();
 
+        foreach (var (idxName, isAuto) in uniqueIndexes)
+        {
             using var infoCmd = db.Database.GetDbConnection().CreateCommand();
             infoCmd.CommandText = $"PRAGMA index_info({idxName})";
             using var infoReader = await infoCmd.ExecuteReaderAsync();
@@ -250,25 +255,85 @@ static async Task RunMigrationsAsync(AppDbContext db, ScraperOptions options)
                 idxColumns.Add(infoReader.GetString(2));
             await infoReader.DisposeAsync();
 
-            // Detect old 2-column unique index: has hotel_id + date but NOT room_type
-            if (idxColumns.Count == 2
+            // Detect old 2-column unique constraint: has hotel_id + date but NOT room_type
+            var isOldConstraint = idxColumns.Count == 2
                 && idxColumns.Contains("hotel_id", StringComparer.OrdinalIgnoreCase)
                 && idxColumns.Contains("date", StringComparer.OrdinalIgnoreCase)
-                && !idxColumns.Contains("room_type", StringComparer.OrdinalIgnoreCase))
-            {
-                indexesToDrop.Add(idxName);
-            }
+                && !idxColumns.Contains("room_type", StringComparer.OrdinalIgnoreCase);
+
+            if (!isOldConstraint) continue;
+
+            if (isAuto)
+                oldAutoIndex = idxName;
+            else
+                oldRegularIndexes.Add(idxName);
         }
 
-        foreach (var oldIdx in indexesToDrop)
+        // Drop regular indexes (safe to DROP INDEX)
+        foreach (var oldIdx in oldRegularIndexes)
         {
             cmd.CommandText = $"DROP INDEX IF EXISTS {oldIdx}";
             await cmd.ExecuteNonQueryAsync();
         }
 
-        // Create the correct 3-column unique index if it doesn't exist
-        cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_date_room ON prices (hotel_id, date, room_type)";
-        await cmd.ExecuteNonQueryAsync();
+        // Inline UNIQUE constraint — must rebuild the table to remove it
+        if (oldAutoIndex is not null)
+        {
+            // Gather current column definitions
+            cmd.CommandText = "PRAGMA table_info(prices)";
+            using var colReader = await cmd.ExecuteReaderAsync();
+            var colDefs = new List<(string Name, string Type, int NotNull, string Default)>();
+            while (await colReader.ReadAsync())
+            {
+                colDefs.Add((
+                    colReader.GetString(1),
+                    colReader.GetString(2),
+                    colReader.GetInt32(3),
+                    colReader.IsDBNull(4) ? "" : colReader.GetString(4)
+                ));
+            }
+            await colReader.DisposeAsync();
+
+            // Build CREATE TABLE for the replacement table with 3-column UNIQUE
+            var colLines = new List<string>();
+            var colNames = new List<string>();
+            foreach (var (name, type, notNull, def) in colDefs)
+            {
+                colNames.Add(name);
+                var line = $"\"{name}\" {type}";
+                if (notNull != 0) line += " NOT NULL";
+                if (def.Length > 0) line += $" DEFAULT {def}";
+                colLines.Add(line);
+            }
+            colLines.Add("CONSTRAINT uq_hotel_date_room UNIQUE (\"hotel_id\", \"date\", \"room_type\")");
+
+            var colsList = string.Join(", ", colLines);
+            var colsCsv = string.Join(", ", colNames.Select(c => $"\"{c}\""));
+
+            cmd.CommandText = $"CREATE TABLE prices_new ({colsList})";
+            await cmd.ExecuteNonQueryAsync();
+
+            cmd.CommandText = $"INSERT INTO prices_new SELECT {colsCsv} FROM prices";
+            await cmd.ExecuteNonQueryAsync();
+
+            cmd.CommandText = "DROP TABLE prices";
+            await cmd.ExecuteNonQueryAsync();
+
+            cmd.CommandText = "ALTER TABLE prices_new RENAME TO prices";
+            await cmd.ExecuteNonQueryAsync();
+
+            // Recreate non-unique indexes that were on the old table
+            cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_prices_HotelId ON prices (hotel_id)";
+            await cmd.ExecuteNonQueryAsync();
+            cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_prices_Date ON prices (date)";
+            await cmd.ExecuteNonQueryAsync();
+        }
+        else
+        {
+            // No inline constraint to rebuild — just ensure the 3-column unique index exists
+            cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_date_room ON prices (hotel_id, date, room_type)";
+            await cmd.ExecuteNonQueryAsync();
+        }
     }
     catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("no such table"))
     {
