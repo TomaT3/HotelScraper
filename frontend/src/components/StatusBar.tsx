@@ -42,7 +42,7 @@ export default function StatusBar({
           <div>
             <span className="text-gray-500">Preise:</span>{" "}
             <span className="font-semibold">
-              {status.total_prices.toLocaleString("de-DE")}
+              {(status.total_prices ?? 0).toLocaleString("de-DE")}
             </span>
           </div>
           <div>

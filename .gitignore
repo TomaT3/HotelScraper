@@ -1,3 +1,11 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+TestResults/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -15,8 +23,8 @@ frontend/tsconfig.tsbuildinfo
 # Build artifacts (frontend outputs to backend/static/)
 backend/static/
 
-# Data
-data/
+# Data (root-level only)
+/data/
 !backend/tests/data/
 *.db
 

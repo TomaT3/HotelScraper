@@ -7,11 +7,11 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      - RAPIDAPI_KEY=${RAPIDAPI_KEY}
-      - DATABASE_URL=sqlite+aiosqlite:///./data/hotel_prices.db
-      - DATES_PER_RUN=${DATES_PER_RUN:-15}
-      - FETCH_HOUR=${FETCH_HOUR:-3}
-      - SEARCH_CITIES=${SEARCH_CITIES:-Stuttgart}
+      - Scraper__RapidApiKey=${RAPIDAPI_KEY}
+      - Scraper__DatabaseUrl=Data Source=data/hotel_prices.db
+      - Scraper__DatesPerRun=${DATES_PER_RUN:-15}
+      - Scraper__FetchHour=${FETCH_HOUR:-3}
+      - Scraper__SearchCities=Stuttgart,Tübingen
     restart: unless-stopped
     logging:
       driver: json-file
