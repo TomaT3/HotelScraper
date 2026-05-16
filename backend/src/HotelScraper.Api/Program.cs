@@ -209,8 +209,15 @@ static async Task RunMigrationsAsync(AppDbContext db, ScraperOptions options)
         cmd.CommandText = "PRAGMA table_info(prices)";
         using var priceColumnsReader = await cmd.ExecuteReaderAsync();
         var priceColumns = new List<string>();
+        var pricesIdMissingPk = false;
         while (await priceColumnsReader.ReadAsync())
-            priceColumns.Add(priceColumnsReader.GetString(1));
+        {
+            var colName = priceColumnsReader.GetString(1);
+            priceColumns.Add(colName);
+            // Detect if 'id' column is missing PRIMARY KEY (corrupted by a previous table rebuild)
+            if (string.Equals(colName, "id", StringComparison.OrdinalIgnoreCase) && priceColumnsReader.GetInt32(5) == 0)
+                pricesIdMissingPk = true;
+        }
         await priceColumnsReader.DisposeAsync();
 
         if (!priceColumns.Contains("room_type"))
@@ -276,20 +283,22 @@ static async Task RunMigrationsAsync(AppDbContext db, ScraperOptions options)
             await cmd.ExecuteNonQueryAsync();
         }
 
-        // Inline UNIQUE constraint — must rebuild the table to remove it
-        if (oldAutoIndex is not null)
+        // Inline UNIQUE constraint — must rebuild the table to remove it.
+        // Also rebuild if the id column is missing PRIMARY KEY (corrupted by a previous table rebuild).
+        if (oldAutoIndex is not null || pricesIdMissingPk)
         {
             // Gather current column definitions
             cmd.CommandText = "PRAGMA table_info(prices)";
             using var colReader = await cmd.ExecuteReaderAsync();
-            var colDefs = new List<(string Name, string Type, int NotNull, string Default)>();
+            var colDefs = new List<(string Name, string Type, int NotNull, string Default, int Pk)>();
             while (await colReader.ReadAsync())
             {
                 colDefs.Add((
                     colReader.GetString(1),
                     colReader.GetString(2),
                     colReader.GetInt32(3),
-                    colReader.IsDBNull(4) ? "" : colReader.GetString(4)
+                    colReader.IsDBNull(4) ? "" : colReader.GetString(4),
+                    colReader.GetInt32(5)
                 ));
             }
             await colReader.DisposeAsync();
@@ -297,12 +306,13 @@ static async Task RunMigrationsAsync(AppDbContext db, ScraperOptions options)
             // Build CREATE TABLE for the replacement table with 3-column UNIQUE
             var colLines = new List<string>();
             var colNames = new List<string>();
-            foreach (var (name, type, notNull, def) in colDefs)
+            foreach (var (name, type, notNull, def, pk) in colDefs)
             {
                 colNames.Add(name);
                 var line = $"\"{name}\" {type}";
                 if (notNull != 0) line += " NOT NULL";
                 if (def.Length > 0) line += $" DEFAULT {def}";
+                if (pk != 0) line += " PRIMARY KEY AUTOINCREMENT";
                 colLines.Add(line);
             }
             colLines.Add("CONSTRAINT uq_hotel_date_room UNIQUE (\"hotel_id\", \"date\", \"room_type\")");
