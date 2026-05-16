@@ -123,7 +123,10 @@ jobs:
           else
             TAG="${{ github.ref_name }}"
           fi
+          # Strip 'v' prefix for NuGet-compatible version (e.g. v1.8.0 → 1.8.0)
+          VERSION="${TAG#v}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Docker metadata
         id: meta
@@ -148,4 +151,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ steps.version.outputs.tag }}
+            VERSION=${{ steps.version.outputs.version }}
