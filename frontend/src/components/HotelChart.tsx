@@ -107,17 +107,6 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
     else if (!isMobile) setLegendOpen(true);
   }, [isMobile, isMany]);
 
-  if (filtered.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-400">
-        <p className="text-lg">Keine Daten verfügbar</p>
-        <p className="text-sm mt-1">
-          Wähle Hotels aus und starte einen Abruf, um Preise zu sehen.
-        </p>
-      </div>
-    );
-  }
-
   // Custom tooltip – only shown on hover, does NOT interfere with selected date
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
@@ -190,8 +179,18 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
       </div>
 
       <div className="flex flex-col lg:flex-row gap-4">
-        {/* Chart */}
-        <div className="flex-1 min-w-0">
+        {/* Empty state */}
+        {filtered.length === 0 ? (
+          <div className="flex-1 text-center text-gray-400 py-16">
+            <p className="text-lg">Keine Daten verfügbar</p>
+            <p className="text-sm mt-1">
+              Wähle Hotels aus und starte einen Abruf, um Preise zu sehen.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Chart */}
+            <div className="flex-1 min-w-0">
           <ResponsiveContainer width="100%" height={chartHeight}>
             <LineChart
               data={chartData}
@@ -246,56 +245,58 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
               ))}
             </LineChart>
           </ResponsiveContainer>
-        </div>
+            </div>
 
-        {/* Selected date panel */}
-        {selectedDate && selectedDatePrices.length > 0 && (
-          <div className="lg:w-72 flex-shrink-0 border border-gray-200 rounded-lg bg-gray-50 p-3 max-h-[500px] flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-semibold text-sm text-gray-700">
-                {new Date(selectedDate + "T00:00:00").toLocaleDateString("de-DE", {
-                  weekday: "short",
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </h4>
-              <button
-                onClick={() => setSelectedDate(null)}
-                className="text-gray-400 hover:text-gray-600 text-lg leading-none"
-                title="Auswahl aufheben"
-              >
-                &times;
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1 space-y-1 text-sm">
-              {selectedDatePrices.map((h, i) => (
-                <div
-                  key={i}
-                  className="flex justify-between items-center gap-2 px-2 py-1 rounded hover:bg-white"
-                >
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span
-                      className="inline-block w-2.5 h-0.5 flex-shrink-0 rounded"
-                      style={{ backgroundColor: h.color }}
-                    />
-                    <span className="truncate text-gray-700">{h.hotel_name}</span>
-                    {h.stars && (
-                      <span className="text-yellow-500 text-xs flex-shrink-0">
-                        {"★".repeat(h.stars)}
-                      </span>
-                    )}
-                  </div>
-                  <span className="font-medium text-gray-900 flex-shrink-0">
-                    {h.price?.toFixed(0)} €
-                  </span>
+            {/* Selected date panel */}
+            {selectedDate && selectedDatePrices.length > 0 && (
+              <div className="lg:w-72 flex-shrink-0 border border-gray-200 rounded-lg bg-gray-50 p-3 max-h-[500px] flex flex-col">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-sm text-gray-700">
+                    {new Date(selectedDate + "T00:00:00").toLocaleDateString("de-DE", {
+                      weekday: "short",
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </h4>
+                  <button
+                    onClick={() => setSelectedDate(null)}
+                    className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                    title="Auswahl aufheben"
+                  >
+                    &times;
+                  </button>
                 </div>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-200 text-center">
-              {selectedDatePrices.length} Hotels
-            </p>
-          </div>
+                <div className="overflow-y-auto flex-1 space-y-1 text-sm">
+                  {selectedDatePrices.map((h, i) => (
+                    <div
+                      key={i}
+                      className="flex justify-between items-center gap-2 px-2 py-1 rounded hover:bg-white"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className="inline-block w-2.5 h-0.5 flex-shrink-0 rounded"
+                          style={{ backgroundColor: h.color }}
+                        />
+                        <span className="truncate text-gray-700">{h.hotel_name}</span>
+                        {h.stars && (
+                          <span className="text-yellow-500 text-xs flex-shrink-0">
+                            {"★".repeat(h.stars)}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-medium text-gray-900 flex-shrink-0">
+                        {h.price?.toFixed(0)} €
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-200 text-center">
+                  {selectedDatePrices.length} Hotels
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
