@@ -205,7 +205,7 @@ static async Task RunMigrationsAsync(AppDbContext db, ScraperOptions options)
             }
         }
 
-        // Migration: add 'room_type' column to prices + update unique index
+        // Migration: add 'room_type' column to prices + ensure correct unique index
         cmd.CommandText = "PRAGMA table_info(prices)";
         using var priceColumnsReader = await cmd.ExecuteReaderAsync();
         var priceColumns = new List<string>();
@@ -219,20 +219,56 @@ static async Task RunMigrationsAsync(AppDbContext db, ScraperOptions options)
             {
                 cmd.CommandText = "ALTER TABLE prices ADD COLUMN room_type TEXT NOT NULL DEFAULT 'double'";
                 await cmd.ExecuteNonQueryAsync();
-
-                // Drop old unique index on (hotel_id, date)
-                cmd.CommandText = "DROP INDEX IF EXISTS uq_hotel_date";
-                await cmd.ExecuteNonQueryAsync();
-
-                // Create new unique index on (hotel_id, date, room_type)
-                cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_date_room ON prices (hotel_id, date, room_type)";
-                await cmd.ExecuteNonQueryAsync();
             }
             catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("duplicate column"))
             {
                 // Column already exists — skip
             }
         }
+
+        // Ensure the unique index is on (hotel_id, date, room_type), not the old (hotel_id, date).
+        // This runs every startup to fix databases that were partially migrated or
+        // created with an older model that had a 2-column unique constraint.
+        // First, discover any 2-column unique index on prices (regardless of its name).
+        cmd.CommandText = "PRAGMA index_list(prices)";
+        using var idxListReader = await cmd.ExecuteReaderAsync();
+        var indexNames = new List<(string Name, bool IsUnique)>();
+        while (await idxListReader.ReadAsync())
+            indexNames.Add((idxListReader.GetString(1), idxListReader.GetInt32(2) == 1));
+        await idxListReader.DisposeAsync();
+
+        var indexesToDrop = new List<string>();
+        foreach (var (idxName, isUnique) in indexNames)
+        {
+            if (!isUnique) continue;
+
+            using var infoCmd = db.Database.GetDbConnection().CreateCommand();
+            infoCmd.CommandText = $"PRAGMA index_info({idxName})";
+            using var infoReader = await infoCmd.ExecuteReaderAsync();
+            var idxColumns = new List<string>();
+            while (await infoReader.ReadAsync())
+                idxColumns.Add(infoReader.GetString(2));
+            await infoReader.DisposeAsync();
+
+            // Detect old 2-column unique index: has hotel_id + date but NOT room_type
+            if (idxColumns.Count == 2
+                && idxColumns.Contains("hotel_id", StringComparer.OrdinalIgnoreCase)
+                && idxColumns.Contains("date", StringComparer.OrdinalIgnoreCase)
+                && !idxColumns.Contains("room_type", StringComparer.OrdinalIgnoreCase))
+            {
+                indexesToDrop.Add(idxName);
+            }
+        }
+
+        foreach (var oldIdx in indexesToDrop)
+        {
+            cmd.CommandText = $"DROP INDEX IF EXISTS {oldIdx}";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        // Create the correct 3-column unique index if it doesn't exist
+        cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_date_room ON prices (hotel_id, date, room_type)";
+        await cmd.ExecuteNonQueryAsync();
     }
     catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("no such table"))
     {

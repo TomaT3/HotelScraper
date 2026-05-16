@@ -108,6 +108,7 @@ public class PriceFetcherService
 
     /// <summary>
     /// Insert or update a price for a hotel on a specific date and room type.
+    /// Handles UNIQUE constraint violations gracefully (safety net for partially migrated databases).
     /// </summary>
     public async Task SavePriceAsync(AppDbContext db, int hotelId, DateOnly priceDate, double priceEur, string roomType)
     {
@@ -118,19 +119,43 @@ public class PriceFetcherService
         {
             existing.PriceEur = priceEur;
             existing.FetchedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+            return;
         }
-        else
+
+        db.Prices.Add(new Price
         {
-            db.Prices.Add(new Price
-            {
-                HotelId = hotelId,
-                Date = priceDate,
-                PriceEur = priceEur,
-                RoomType = roomType,
-                FetchedAt = DateTime.UtcNow,
-            });
+            HotelId = hotelId,
+            Date = priceDate,
+            PriceEur = priceEur,
+            RoomType = roomType,
+            FetchedAt = DateTime.UtcNow,
+        });
+
+        try
+        {
+            await db.SaveChangesAsync();
         }
-        await db.SaveChangesAsync();
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex)
+            when (ex.InnerException is Microsoft.Data.Sqlite.SqliteException sqlEx
+                  && sqlEx.Message.Contains("UNIQUE constraint failed"))
+        {
+            // Constraint violation — the row already exists (likely a mismatched DB schema).
+            // Detach the failed entity and update the existing row instead.
+            var entry = db.ChangeTracker.Entries<Price>()
+                .FirstOrDefault(e => e.Entity.HotelId == hotelId && e.Entity.Date == priceDate && e.Entity.RoomType == roomType);
+            if (entry is not null)
+                entry.State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+
+            var retry = await db.Prices
+                .FirstOrDefaultAsync(p => p.HotelId == hotelId && p.Date == priceDate && p.RoomType == roomType);
+            if (retry is not null)
+            {
+                retry.PriceEur = priceEur;
+                retry.FetchedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+            }
+        }
     }
 
     /// <summary>
