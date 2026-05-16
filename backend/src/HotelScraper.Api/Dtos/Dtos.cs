@@ -26,7 +26,8 @@ public record HotelUpdate(
 
 public record PricePoint(
     [property: JsonPropertyName("date")] DateOnly Date,
-    [property: JsonPropertyName("price_eur")] double PriceEur
+    [property: JsonPropertyName("price_eur")] double PriceEur,
+    [property: JsonPropertyName("room_type")] string RoomType
 );
 
 public record HotelPrices(

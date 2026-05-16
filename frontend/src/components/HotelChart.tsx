@@ -14,6 +14,8 @@ import type { HotelPrices } from "../api/types";
 interface Props {
   data: HotelPrices[];
   selectedIds: Set<number>;
+  roomType: "single" | "double";
+  onRoomTypeChange: (type: "single" | "double") => void;
 }
 
 // Distinct colors for up to 20 hotels
@@ -39,7 +41,7 @@ function useWindowWidth() {
   return width;
 }
 
-export default function HotelChart({ data, selectedIds }: Props) {
+export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChange }: Props) {
   const [hoveredHotel, setHoveredHotel] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(true);
@@ -159,9 +161,33 @@ export default function HotelChart({ data, selectedIds }: Props) {
 
   return (
     <div className="bg-white rounded-lg shadow p-2 sm:p-4">
-      <h3 className="font-semibold text-gray-700 mb-2 sm:mb-4 text-sm sm:text-base">
-        Preisverlauf — Doppelzimmer / Nacht
-      </h3>
+      <div className="flex items-center justify-between mb-2 sm:mb-4 flex-wrap gap-2">
+        <h3 className="font-semibold text-gray-700 text-sm sm:text-base">
+          Preisverlauf — {roomType === "single" ? "Einzelzimmer" : "Doppelzimmer"} / Nacht
+        </h3>
+        <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
+          <button
+            onClick={() => onRoomTypeChange("double")}
+            className={`px-3 py-1 rounded-md font-medium transition-colors ${
+              roomType === "double"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Doppelzimmer
+          </button>
+          <button
+            onClick={() => onRoomTypeChange("single")}
+            className={`px-3 py-1 rounded-md font-medium transition-colors ${
+              roomType === "single"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Einzelzimmer
+          </button>
+        </div>
+      </div>
 
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Chart */}

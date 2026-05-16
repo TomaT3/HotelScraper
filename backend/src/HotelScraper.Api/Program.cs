@@ -204,6 +204,35 @@ static async Task RunMigrationsAsync(AppDbContext db, ScraperOptions options)
                 // Column already exists — skip
             }
         }
+
+        // Migration: add 'room_type' column to prices + update unique index
+        cmd.CommandText = "PRAGMA table_info(prices)";
+        using var priceColumnsReader = await cmd.ExecuteReaderAsync();
+        var priceColumns = new List<string>();
+        while (await priceColumnsReader.ReadAsync())
+            priceColumns.Add(priceColumnsReader.GetString(1));
+        await priceColumnsReader.DisposeAsync();
+
+        if (!priceColumns.Contains("room_type"))
+        {
+            try
+            {
+                cmd.CommandText = "ALTER TABLE prices ADD COLUMN room_type TEXT NOT NULL DEFAULT 'double'";
+                await cmd.ExecuteNonQueryAsync();
+
+                // Drop old unique index on (hotel_id, date)
+                cmd.CommandText = "DROP INDEX IF EXISTS uq_hotel_date";
+                await cmd.ExecuteNonQueryAsync();
+
+                // Create new unique index on (hotel_id, date, room_type)
+                cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_date_room ON prices (hotel_id, date, room_type)";
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("duplicate column"))
+            {
+                // Column already exists — skip
+            }
+        }
     }
     catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("no such table"))
     {

@@ -34,6 +34,7 @@ export async function getPrices(params?: {
   hotelIds?: number[];
   from?: string;
   to?: string;
+  roomType?: string;
 }): Promise<HotelPrices[]> {
   const searchParams = new URLSearchParams();
   if (params?.hotelIds?.length) {
@@ -41,6 +42,7 @@ export async function getPrices(params?: {
   }
   if (params?.from) searchParams.set("from", params.from);
   if (params?.to) searchParams.set("to", params.to);
+  if (params?.roomType) searchParams.set("room_type", params.roomType);
 
   const qs = searchParams.toString();
   return fetchJson<HotelPrices[]>(`${BASE}/prices${qs ? `?${qs}` : ""}`);

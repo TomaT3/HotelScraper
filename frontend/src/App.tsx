@@ -60,6 +60,7 @@ export default function App() {
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState<Map<string, Set<number>>>(() => loadFavorites());
   const [version, setVersion] = useState<string | null>(null);
+  const [roomType, setRoomType] = useState<"single" | "double">("double");
 
   // Persist favorites to localStorage whenever they change
   useEffect(() => {
@@ -154,6 +155,7 @@ export default function App() {
           hotelIds: Array.from(selectedIds),
           from: dateFrom,
           to: dateTo,
+          roomType,
         });
         if (!cancelled) setPrices(p);
       } catch (e) {
@@ -164,7 +166,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedIds, dateFrom, dateTo]);
+  }, [selectedIds, dateFrom, dateTo, roomType]);
 
   const handleCityChange = useCallback((city: string) => {
     setSelectedCity(city);
@@ -328,13 +330,13 @@ export default function App() {
 
         {/* Main chart area – shown first on mobile */}
         <div className="lg:col-span-3 order-1 lg:order-2">
-          <HotelChart data={prices} selectedIds={selectedIds} />
+          <HotelChart data={prices} selectedIds={selectedIds} roomType={roomType} onRoomTypeChange={setRoomType} />
         </div>
       </div>
 
       {/* Footer */}
       <div className="text-center text-xs text-gray-400 pt-4">
-        Daten via Booking.com (RapidAPI) · Preise für Doppelzimmer / 1 Nacht / 2 Erwachsene
+        Daten via Booking.com (RapidAPI) · Preise für {roomType === "single" ? "Einzelzimmer" : "Doppelzimmer"} / 1 Nacht
         {version && (
           <span className="ml-2 font-mono text-gray-300">· {version}</span>
         )}

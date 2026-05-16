@@ -125,6 +125,15 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
                     HotelId = hotel.Id,
                     Date = today.AddDays(i + 1),
                     PriceEur = 100 + i * 5,
+                    RoomType = "double",
+                    FetchedAt = DateTime.UtcNow
+                });
+                _db.Prices.Add(new Price
+                {
+                    HotelId = hotel.Id,
+                    Date = today.AddDays(i + 1),
+                    PriceEur = 70 + i * 3,
+                    RoomType = "single",
                     FetchedAt = DateTime.UtcNow
                 });
             }
@@ -269,6 +278,25 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         }
     }
 
+    [Fact]
+    public async Task GetPrices_DefaultsToDoubleRoomType()
+    {
+        var response = await _client.GetAsync("/api/prices");
+        var data = await response.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+        Assert.NotNull(data);
+        Assert.All(data!, h => Assert.All(h.Prices, p => Assert.Equal("double", p.RoomType)));
+    }
+
+    [Fact]
+    public async Task GetPrices_FilterByRoomTypeSingle()
+    {
+        var response = await _client.GetAsync("/api/prices?room_type=single");
+        var data = await response.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+        Assert.NotNull(data);
+        Assert.NotEmpty(data!);
+        Assert.All(data!, h => Assert.All(h.Prices, p => Assert.Equal("single", p.RoomType)));
+    }
+
     // ── Status ────────────────────────────────────────────────────────
 
     [Fact]
@@ -280,7 +308,7 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         Assert.NotNull(data);
         Assert.Equal(3, data!.TotalHotels);
         Assert.Equal(2, data.ActiveHotels);
-        Assert.Equal(30, data.TotalPrices);
+        Assert.Equal(60, data.TotalPrices);
     }
 
     [Fact]
@@ -320,7 +348,8 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         [property: JsonPropertyName("prices")] List<PricePointResponse> Prices);
     private record PricePointResponse(
         [property: JsonPropertyName("date")] string Date,
-    [property: JsonPropertyName("price_eur")] double PriceEur);
+        [property: JsonPropertyName("price_eur")] double PriceEur,
+        [property: JsonPropertyName("room_type")] string RoomType);
     private record StatusResponse(
         [property: JsonPropertyName("city")] string? City,
         [property: JsonPropertyName("total_hotels")] int TotalHotels,
