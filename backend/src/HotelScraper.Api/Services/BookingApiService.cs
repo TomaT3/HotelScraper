@@ -57,10 +57,10 @@ public class BookingApiService
     /// Search for hotels with prices for a specific date range.
     /// Fetches page 1 and 2, deduplicates by booking_id.
     /// </summary>
-    public async Task<List<HotelResult>> SearchHotelsAsync(string destId, DateOnly checkin, DateOnly checkout)
+    public async Task<List<HotelResult>> SearchHotelsAsync(string destId, DateOnly checkin, DateOnly checkout, int adults = 2)
     {
-        var page1 = await FetchHotelPageAsync(destId, checkin, checkout, 1);
-        var page2 = await FetchHotelPageAsync(destId, checkin, checkout, 2);
+        var page1 = await FetchHotelPageAsync(destId, checkin, checkout, 1, adults);
+        var page2 = await FetchHotelPageAsync(destId, checkin, checkout, 2, adults);
 
         // Deduplicate by booking_id — keep first occurrence
         var seen = new HashSet<string>();
@@ -81,7 +81,7 @@ public class BookingApiService
     }
 
     private async Task<List<HotelResult>> FetchHotelPageAsync(
-        string destId, DateOnly checkin, DateOnly checkout, int pageNumber)
+        string destId, DateOnly checkin, DateOnly checkout, int pageNumber, int adults = 2)
     {
         var queryParams = new Dictionary<string, string>
         {
@@ -89,7 +89,7 @@ public class BookingApiService
             ["search_type"] = "CITY",
             ["arrival_date"] = checkin.ToString("yyyy-MM-dd"),
             ["departure_date"] = checkout.ToString("yyyy-MM-dd"),
-            ["adults"] = "2",
+            ["adults"] = adults.ToString(),
             ["room_qty"] = "1",
             ["units"] = "metric",
             ["temperature_unit"] = "c",

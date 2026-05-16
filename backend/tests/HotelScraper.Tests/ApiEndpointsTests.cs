@@ -125,6 +125,15 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
                     HotelId = hotel.Id,
                     Date = today.AddDays(i + 1),
                     PriceEur = 100 + i * 5,
+                    RoomType = "double",
+                    FetchedAt = DateTime.UtcNow
+                });
+                _db.Prices.Add(new Price
+                {
+                    HotelId = hotel.Id,
+                    Date = today.AddDays(i + 1),
+                    PriceEur = 70 + i * 3,
+                    RoomType = "single",
                     FetchedAt = DateTime.UtcNow
                 });
             }
@@ -269,6 +278,117 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         }
     }
 
+    [Fact]
+    public async Task GetPrices_DefaultsToDoubleRoomType()
+    {
+        var response = await _client.GetAsync("/api/prices");
+        var data = await response.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+        Assert.NotNull(data);
+        Assert.All(data!, h => Assert.All(h.Prices, p => Assert.Equal("double", p.RoomType)));
+    }
+
+    [Fact]
+    public async Task GetPrices_FilterByRoomTypeSingle()
+    {
+        var response = await _client.GetAsync("/api/prices?room_type=single");
+        var data = await response.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+        Assert.NotNull(data);
+        Assert.NotEmpty(data!);
+        Assert.All(data!, h => Assert.All(h.Prices, p => Assert.Equal("single", p.RoomType)));
+    }
+
+    [Fact]
+    public async Task GetPrices_PricePointContainsRoomType()
+    {
+        var response = await _client.GetAsync("/api/prices?room_type=double");
+        var data = await response.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+        Assert.NotNull(data);
+        Assert.NotEmpty(data!);
+        var firstPrice = data![0].Prices[0];
+        Assert.NotNull(firstPrice.RoomType);
+        Assert.NotEmpty(firstPrice.RoomType);
+    }
+
+    [Fact]
+    public async Task GetPrices_ReturnsCorrectSeedValuesForBothRoomTypes()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var hotel = await _db.Hotels.FirstAsync(h => h.BookingId == "1001");
+
+        var responseDouble = await _client.GetAsync($"/api/prices?hotel_ids={hotel.Id}&room_type=double");
+        var dataDouble = await responseDouble.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+
+        var responseSingle = await _client.GetAsync($"/api/prices?hotel_ids={hotel.Id}&room_type=single");
+        var dataSingle = await responseSingle.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+
+        Assert.NotNull(dataDouble);
+        Assert.NotNull(dataSingle);
+        Assert.Single(dataDouble!);
+        Assert.Single(dataSingle!);
+
+        // Verify seed values: double = 100 + i*5, single = 70 + i*3
+        for (int i = 0; i < 15; i++)
+        {
+            var expectedDate = today.AddDays(i + 1).ToString("yyyy-MM-dd");
+            var expectedDouble = 100 + i * 5;
+            var expectedSingle = 70 + i * 3;
+
+            var dPrice = dataDouble![0].Prices.First(p => p.Date == expectedDate);
+            Assert.Equal(expectedDouble, dPrice.PriceEur);
+
+            var sPrice = dataSingle![0].Prices.First(p => p.Date == expectedDate);
+            Assert.Equal(expectedSingle, sPrice.PriceEur);
+        }
+    }
+
+    [Fact]
+    public async Task GetPrices_FilterByHotelIdsAndRoomType()
+    {
+        var hotel = await _db.Hotels.FirstAsync(h => h.BookingId == "1001");
+
+        var response = await _client.GetAsync($"/api/prices?hotel_ids={hotel.Id}&room_type=single");
+        var data = await response.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+
+        Assert.NotNull(data);
+        Assert.Single(data!);
+        Assert.Equal(hotel.Id, data![0].HotelId);
+        Assert.All(data!, h => Assert.All(h.Prices, p => Assert.Equal("single", p.RoomType)));
+    }
+
+    [Fact]
+    public async Task GetPrices_UnknownRoomTypeReturnsEmpty()
+    {
+        var response = await _client.GetAsync("/api/prices?room_type=triple");
+        var data = await response.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+        Assert.NotNull(data);
+        Assert.Empty(data!);
+    }
+
+    [Fact]
+    public async Task GetPrices_EachDateHasBothRoomTypes()
+    {
+        var hotel = await _db.Hotels.FirstAsync(h => h.BookingId == "1001");
+
+        var responseDouble = await _client.GetAsync($"/api/prices?hotel_ids={hotel.Id}&room_type=double");
+        var dataDouble = await responseDouble.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+
+        var responseSingle = await _client.GetAsync($"/api/prices?hotel_ids={hotel.Id}&room_type=single");
+        var dataSingle = await responseSingle.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+
+        Assert.NotNull(dataDouble);
+        Assert.NotNull(dataSingle);
+        Assert.Single(dataDouble!);
+        Assert.Single(dataSingle!);
+
+        var doubleDates = dataDouble![0].Prices.Select(p => p.Date).ToHashSet();
+        var singleDates = dataSingle![0].Prices.Select(p => p.Date).ToHashSet();
+
+        // Each date should be present in both room types
+        Assert.Equal(doubleDates.Count, singleDates.Count);
+        Assert.True(doubleDates.SetEquals(singleDates),
+            "The same set of dates should exist for both single and double room types");
+    }
+
     // ── Status ────────────────────────────────────────────────────────
 
     [Fact]
@@ -280,7 +400,7 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         Assert.NotNull(data);
         Assert.Equal(3, data!.TotalHotels);
         Assert.Equal(2, data.ActiveHotels);
-        Assert.Equal(30, data.TotalPrices);
+        Assert.Equal(60, data.TotalPrices);
     }
 
     [Fact]
@@ -320,7 +440,8 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         [property: JsonPropertyName("prices")] List<PricePointResponse> Prices);
     private record PricePointResponse(
         [property: JsonPropertyName("date")] string Date,
-    [property: JsonPropertyName("price_eur")] double PriceEur);
+        [property: JsonPropertyName("price_eur")] double PriceEur,
+        [property: JsonPropertyName("room_type")] string RoomType);
     private record StatusResponse(
         [property: JsonPropertyName("city")] string? City,
         [property: JsonPropertyName("total_hotels")] int TotalHotels,

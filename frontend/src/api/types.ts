@@ -19,6 +19,7 @@ export interface City {
 export interface PricePoint {
   date: string;
   price_eur: number;
+  room_type: string;
 }
 
 export interface HotelPrices {

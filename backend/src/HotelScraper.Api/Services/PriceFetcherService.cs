@@ -107,12 +107,12 @@ public class PriceFetcherService
     }
 
     /// <summary>
-    /// Insert or update a price for a hotel on a specific date.
+    /// Insert or update a price for a hotel on a specific date and room type.
     /// </summary>
-    public async Task SavePriceAsync(AppDbContext db, int hotelId, DateOnly priceDate, double priceEur)
+    public async Task SavePriceAsync(AppDbContext db, int hotelId, DateOnly priceDate, double priceEur, string roomType)
     {
         var existing = await db.Prices
-            .FirstOrDefaultAsync(p => p.HotelId == hotelId && p.Date == priceDate);
+            .FirstOrDefaultAsync(p => p.HotelId == hotelId && p.Date == priceDate && p.RoomType == roomType);
 
         if (existing is not null)
         {
@@ -126,6 +126,7 @@ public class PriceFetcherService
                 HotelId = hotelId,
                 Date = priceDate,
                 PriceEur = priceEur,
+                RoomType = roomType,
                 FetchedAt = DateTime.UtcNow,
             });
         }
@@ -165,24 +166,47 @@ public class PriceFetcherService
         foreach (var checkDate in dates)
         {
             var checkout = checkDate.AddDays(1);
+
+            // Fetch double room prices (adults=2)
             try
             {
-                var hotels = await _bookingApi.SearchHotelsAsync(destId, checkDate, checkout);
-                totalHotels = Math.Max(totalHotels, hotels.Count);
+                var hotelsDouble = await _bookingApi.SearchHotelsAsync(destId, checkDate, checkout, adults: 2);
+                totalHotels = Math.Max(totalHotels, hotelsDouble.Count);
 
-                foreach (var hotelData in hotels)
+                foreach (var hotelData in hotelsDouble)
                 {
                     var hotelId = await UpsertHotelAsync(db, hotelData, city);
-                    await SavePriceAsync(db, hotelId, checkDate, hotelData.PriceEur);
+                    await SavePriceAsync(db, hotelId, checkDate, hotelData.PriceEur, "double");
                     totalPrices++;
                 }
 
-                _logger.LogInformation("[{City}] Saved {Count} prices for {Date}", city, hotels.Count, checkDate);
+                _logger.LogInformation("[{City}] Saved {Count} double-room prices for {Date}", city, hotelsDouble.Count, checkDate);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[{City}] Error fetching {Date}", city, checkDate);
-                errors.Add($"{checkDate:yyyy-MM-dd}: {ex.Message}");
+                _logger.LogError(ex, "[{City}] Error fetching double-room prices for {Date}", city, checkDate);
+                errors.Add($"{checkDate:yyyy-MM-dd} (double): {ex.Message}");
+            }
+
+            // Fetch single room prices (adults=1)
+            try
+            {
+                var hotelsSingle = await _bookingApi.SearchHotelsAsync(destId, checkDate, checkout, adults: 1);
+                totalHotels = Math.Max(totalHotels, hotelsSingle.Count);
+
+                foreach (var hotelData in hotelsSingle)
+                {
+                    var hotelId = await UpsertHotelAsync(db, hotelData, city);
+                    await SavePriceAsync(db, hotelId, checkDate, hotelData.PriceEur, "single");
+                    totalPrices++;
+                }
+
+                _logger.LogInformation("[{City}] Saved {Count} single-room prices for {Date}", city, hotelsSingle.Count, checkDate);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[{City}] Error fetching single-room prices for {Date}", city, checkDate);
+                errors.Add($"{checkDate:yyyy-MM-dd} (single): {ex.Message}");
             }
         }
 

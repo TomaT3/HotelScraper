@@ -53,7 +53,7 @@ public class Hotel
 
 [Index(nameof(HotelId))]
 [Index(nameof(Date))]
-[Index(nameof(HotelId), nameof(Date), IsUnique = true, Name = "uq_hotel_date")]
+[Index(nameof(HotelId), nameof(Date), nameof(RoomType), IsUnique = true, Name = "uq_hotel_date_room")]
 [Table("prices")]
 public class Price
 {
@@ -70,6 +70,10 @@ public class Price
 
     [Column("price_eur")]
     public double PriceEur { get; set; }
+
+    [MaxLength(20)]
+    [Column("room_type")]
+    public string RoomType { get; set; } = "double";
 
     [Column("fetched_at")]
     public DateTime FetchedAt { get; set; } = DateTime.UtcNow;

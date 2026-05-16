@@ -18,8 +18,11 @@ public static class PricesEndpoints
             AppDbContext db,
             string? hotel_ids,
             DateOnly? from,
-            DateOnly? to) =>
+            DateOnly? to,
+            string? room_type) =>
         {
+            var roomType = room_type ?? "double";
+
             var hotelQuery = db.Hotels.AsQueryable();
             if (!string.IsNullOrWhiteSpace(hotel_ids))
             {
@@ -35,7 +38,7 @@ public static class PricesEndpoints
 
             foreach (var hotel in hotels)
             {
-                var priceQuery = db.Prices.Where(p => p.HotelId == hotel.Id);
+                var priceQuery = db.Prices.Where(p => p.HotelId == hotel.Id && p.RoomType == roomType);
                 if (from.HasValue)
                     priceQuery = priceQuery.Where(p => p.Date >= from.Value);
                 if (to.HasValue)
@@ -48,7 +51,7 @@ public static class PricesEndpoints
                         hotel.Id,
                         hotel.Name,
                         hotel.Stars,
-                        prices.Select(p => new PricePoint(p.Date, p.PriceEur)).ToList()
+                        prices.Select(p => new PricePoint(p.Date, p.PriceEur, p.RoomType)).ToList()
                     ));
                 }
             }

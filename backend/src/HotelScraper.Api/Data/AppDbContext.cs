@@ -21,9 +21,9 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Price>(entity =>
         {
-            entity.HasIndex(e => new { e.HotelId, e.Date })
+            entity.HasIndex(e => new { e.HotelId, e.Date, e.RoomType })
                   .IsUnique()
-                  .HasDatabaseName("uq_hotel_date");
+                  .HasDatabaseName("uq_hotel_date_room");
         });
     }
 }
