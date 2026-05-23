@@ -5,16 +5,17 @@ namespace HotelScraper.Api.Services;
 
 public static partial class DistanceParser
 {
-    [GeneratedRegex(@"([\d.]+)\s*miles?\s*from\s*(the\s*)?(city\s*)?cent(er|re)", RegexOptions.IgnoreCase, "en-US")]
+    [GeneratedRegex(@"([\d.]+)\s*miles?\s*from\s*(the\s+)?(city\s+)?(cent(er|re)|downtown)", RegexOptions.IgnoreCase, "en-US")]
     private static partial Regex MilesFromCentreRegex();
 
-    [GeneratedRegex(@"([\d.]+)\s*km\s*from\s*(the\s*)?(city\s*)?cent(er|re)", RegexOptions.IgnoreCase, "en-US")]
+    [GeneratedRegex(@"([\d.]+)\s*km\s*from\s*(the\s+)?(city\s+)?(cent(er|re)|downtown)", RegexOptions.IgnoreCase, "en-US")]
     private static partial Regex KmFromCentreRegex();
 
     /// <summary>
     /// Parse distance from city centre from an accessibilityLabel string.
     /// Handles: "11 miles from centre", "4.1 miles from city center",
-    /// "5 km from the city centre", "In city centre" (0), "In city center" (0).
+    /// "5 km from the city centre", "3 km from downtown",
+    /// "In city centre" (0), "In city center" (0), "In downtown" (0).
     /// Returns distance in kilometres.
     /// </summary>
     public static double? ParseDistanceFromLabel(string? accessibilityLabel)
@@ -22,8 +23,8 @@ public static partial class DistanceParser
         if (string.IsNullOrWhiteSpace(accessibilityLabel))
             return null;
 
-        // In city centre / In city center → distance 0
-        if (Regex.IsMatch(accessibilityLabel, @"\bin\s+(the\s+)?(city\s+)?cent(er|re)\b", RegexOptions.IgnoreCase))
+        // In city centre / In city center / In downtown → distance 0
+        if (Regex.IsMatch(accessibilityLabel, @"\bin\s+(the\s+)?(city\s+)?(cent(er|re)|downtown)\b", RegexOptions.IgnoreCase))
             return 0.0;
 
         // "11 miles from centre"

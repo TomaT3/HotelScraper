@@ -147,4 +147,37 @@ public class DistanceParserTests
         Assert.NotNull(result);
         Assert.True(Math.Abs(1.5 - result!.Value) < 0.01);
     }
+
+    [Fact]
+    public void InDowntown_ShouldReturnZero()
+    {
+        // "In downtown" — used for German cities like Stuttgart
+        var result = DistanceParser.ParseDistanceFromLabel("In downtown");
+        Assert.Equal(0.0, result);
+    }
+
+    [Fact]
+    public void KmFromDowntown_ShouldParseDirectly()
+    {
+        var result = DistanceParser.ParseDistanceFromLabel("3 km from downtown");
+        Assert.NotNull(result);
+        Assert.True(Math.Abs(3.0 - result!.Value) < 0.01);
+    }
+
+    [Fact]
+    public void MilesFromDowntown_ShouldConvertToKm()
+    {
+        var result = DistanceParser.ParseDistanceFromLabel("5 miles from downtown");
+        Assert.NotNull(result);
+        Assert.True(Math.Abs(8.05 - result!.Value) < 0.01, $"Expected ~8.05 but got {result.Value}");
+    }
+
+    [Fact]
+    public void RealisticLabel_StuttgartStyle_InDowntown()
+    {
+        // Simulates real Stuttgart API label: hotel name, rating, "In downtown", room details
+        var label = "EmiLu Design Hotel.\n4 out of 5 for accommodation quality.\n9.0 Wonderful 2304 reviews.\n\u200eIn downtown\u202c.\n Hotel room : 1 bed.\n120 EUR.";
+        var result = DistanceParser.ParseDistanceFromLabel(label);
+        Assert.Equal(0.0, result);
+    }
 }
