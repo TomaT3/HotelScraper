@@ -149,6 +149,14 @@ public class BookingApiService
         _logger.LogInformation("searchHotels page {Page}: deserialized {Count} hotels from JSON",
             pageNumber, hotels.Count);
 
+        // Diagnostic: log first 3 accessibilityLabels to understand format
+        var sampleLabels = hotels.Take(3).Select(h => h.AccessibilityLabel).ToList();
+        for (int i = 0; i < sampleLabels.Count; i++)
+        {
+            _logger.LogInformation("searchHotels page {Page} hotel[{I}] accessibilityLabel: {Label}",
+                pageNumber, i, sampleLabels[i]);
+        }
+
         if (hotels.Count == 0)
         {
             _logger.LogWarning("searchHotels page {Page}: ZERO hotels in response. data?.Data is null={DataNull}. Raw JSON (last 1000 chars): {RawTail}",
