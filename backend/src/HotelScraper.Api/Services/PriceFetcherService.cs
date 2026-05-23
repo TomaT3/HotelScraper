@@ -29,35 +29,75 @@ public class PriceFetcherService
     public async Task<string> GetDestIdAsync(AppDbContext db, string city)
     {
         var key = $"dest_id:{city}";
+
+        // Check cached value
         var setting = await db.Settings.FindAsync(key);
-        if (setting is not null)
+        if (setting is not null && IsValidDestId(setting.Value))
+        {
+            _logger.LogDebug("Using cached dest_id={DestId} for {City}", setting.Value, city);
             return setting.Value;
+        }
+
+        if (setting is not null)
+        {
+            _logger.LogWarning("Cached dest_id for {City} is invalid ({Value}), re-fetching from API", city, setting.Value);
+        }
 
         // Fallback: check old key format (migration from single-city setup)
         if (city == _options.CityList[0])
         {
             var oldSetting = await db.Settings.FindAsync("dest_id");
-            if (oldSetting is not null)
+            if (oldSetting is not null && IsValidDestId(oldSetting.Value))
             {
                 db.Settings.Add(new Setting { Key = key, Value = oldSetting.Value });
                 var oldLabel = await db.Settings.FindAsync("dest_label");
                 if (oldLabel is not null)
                     db.Settings.Add(new Setting { Key = $"dest_label:{city}", Value = oldLabel.Value });
                 await db.SaveChangesAsync();
+                _logger.LogInformation("Migrated old dest_id={DestId} to {City}", oldSetting.Value, city);
                 return oldSetting.Value;
             }
         }
 
+        // Fetch from API
         var location = await _bookingApi.SearchLocationAsync(city);
         if (location is null)
             throw new InvalidOperationException($"Could not find destination for city: {city}");
 
-        db.Settings.Add(new Setting { Key = key, Value = location.DestId });
-        db.Settings.Add(new Setting { Key = $"dest_label:{city}", Value = location.Label });
+        // Update or insert the cached dest_id value
+        if (setting is not null)
+        {
+            setting.Value = location.DestId;
+        }
+        else
+        {
+            db.Settings.Add(new Setting { Key = key, Value = location.DestId });
+        }
+
+        // Update or insert the cached label value
+        var labelKey = $"dest_label:{city}";
+        var labelSetting = await db.Settings.FindAsync(labelKey);
+        if (labelSetting is not null)
+        {
+            labelSetting.Value = location.Label;
+        }
+        else
+        {
+            db.Settings.Add(new Setting { Key = labelKey, Value = location.Label });
+        }
+
         await db.SaveChangesAsync();
 
         _logger.LogInformation("Stored dest_id={DestId} for {Label}", location.DestId, location.Label);
         return location.DestId;
+    }
+
+    /// <summary>
+    /// Returns true if the dest_id looks valid (non-empty and not "0").
+    /// </summary>
+    private static bool IsValidDestId(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) && value != "0";
     }
 
     /// <summary>
