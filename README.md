@@ -2,7 +2,7 @@
 
 Web-App die täglich Hotelpreise für Doppelzimmer in Stuttgart über die Booking.com API (RapidAPI) abruft und als interaktives Liniendiagramm darstellt.
 
-![GitHub Release](https://img.shields.io/github/v/release/TomaT3/HotelScraper?style=flat-square&logo=github) ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/TomaT3/HotelScraper/release-and-publish.yml?style=flat-square&logo=githubactions&label=release%20build) ![Docker Pulls](https://img.shields.io/docker/pulls/tomat3/hotel-price-scraper?style=flat-square&logo=docker) ![Stack](https://img.shields.io/badge/FastAPI-Python-009688?style=flat-square) ![Stack](https://img.shields.io/badge/React-TypeScript-61DAFB?style=flat-square) ![Stack](https://img.shields.io/badge/SQLite-Database-003B57?style=flat-square) ![Stack](https://img.shields.io/badge/Docker-Deployment-2496ED?style=flat-square)
+![GitHub Release](https://img.shields.io/github/v/release/TomaT3/HotelScraper?style=flat-square&logo=github) ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/TomaT3/HotelScraper/release-and-publish.yml?style=flat-square&logo=githubactions&label=release%20build) ![Docker Pulls](https://img.shields.io/docker/pulls/tomat3/hotel-price-scraper?style=flat-square&logo=docker) ![Stack](https://img.shields.io/badge/ASP.NET-C%23-512BD4?style=flat-square) ![Stack](https://img.shields.io/badge/React-TypeScript-61DAFB?style=flat-square) ![Stack](https://img.shields.io/badge/SQLite-Database-003B57?style=flat-square) ![Stack](https://img.shields.io/badge/Docker-Deployment-2496ED?style=flat-square)
 
 ## Features
 
@@ -59,7 +59,7 @@ Alle Einstellungen werden über Umgebungsvariablen gesetzt (`.env` oder `docker-
 | `DATES_PER_RUN` | `15` | Wie viele Tage pro Scheduler-Lauf abgerufen werden |
 | `FETCH_HOUR` | `3` | Uhrzeit (Stunde, 0-23) für den täglichen Abruf |
 | `SEARCH_CITIES` | `Stuttgart` | Städte für die Hotelsuche (komma-getrennt, z.B. `Stuttgart,München,Berlin`) |
-| `DATABASE_URL` | `sqlite+aiosqlite:///./data/hotel_prices.db` | Datenbank-Pfad |
+| `DATABASE_URL` | `data/hotel_prices.db` | Datenbank-Pfad |
 
 ## Deployment auf Synology NAS
 
@@ -110,11 +110,8 @@ Die App ist dann erreichbar unter: `http://<NAS-IP>:8080`
 ### Backend (lokal)
 
 ```bash
-cd backend
-python -m venv .venv
-.venv/Scripts/activate  # Windows
-pip install -e ".[dev]"
-uvicorn app.main:app --reload
+cd backend/src/HotelScraper.Api
+dotnet run
 ```
 
 ### Frontend (lokal)
@@ -130,14 +127,14 @@ Frontend Dev-Server läuft auf `http://localhost:5173` mit Proxy zu `http://loca
 ## Architektur
 
 ```
-Browser → FastAPI (Port 8000)
+Browser → ASP.NET Core (Port 8000)
             ├── /api/*          → REST API (Hotels, Preise, Status)
             ├── /assets/*       → Static Files (React Build)
             └── /*              → SPA Fallback (index.html)
                     ↓
               SQLite (./data/hotel_prices.db)
                     ↓
-              APScheduler → RapidAPI Booking.com
+              Quartz.NET → RapidAPI Booking.com
 ```
 
 ## Datenquelle
