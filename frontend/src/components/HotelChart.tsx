@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  ReferenceArea,
 } from "recharts";
 import type { HotelPrices } from "../api/types";
 
@@ -66,6 +67,34 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
   const chartData = Array.from(dateMap.values()).sort((a, b) =>
     a.date.localeCompare(b.date)
   );
+
+  // Compute consecutive weekend spans (Sat–Sun) for background highlighting
+  const weekendSpans = useMemo(() => {
+    const spans: { start: string; end: string }[] = [];
+    let spanStart: string | null = null;
+
+    for (let i = 0; i < chartData.length; i++) {
+      const dateStr = chartData[i].date;
+      const d = new Date(dateStr + "T00:00:00");
+      const day = d.getDay();
+      const isWeekend = day === 0 || day === 6;
+
+      if (isWeekend && spanStart === null) {
+        spanStart = dateStr;
+      }
+
+      if (!isWeekend && spanStart !== null) {
+        spans.push({ start: spanStart, end: chartData[i - 1].date });
+        spanStart = null;
+      }
+    }
+
+    if (spanStart !== null) {
+      spans.push({ start: spanStart, end: chartData[chartData.length - 1].date });
+    }
+
+    return spans;
+  }, [chartData]);
 
   // Format date for display
   const formatDate = (dateStr: string) => {
@@ -197,6 +226,16 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
               onClick={handleChartClick}
               style={{ cursor: "pointer" }}
             >
+              {weekendSpans.map((span, i) => (
+                <ReferenceArea
+                  key={`we-${i}`}
+                  x1={span.start}
+                  x2={span.end}
+                  fill="#e5e7eb"
+                  fillOpacity={1}
+                  ifOverflow="hidden"
+                />
+              ))}
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis
                 dataKey="date"
