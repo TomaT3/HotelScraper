@@ -119,7 +119,7 @@ public class BookingApiService
             ["room_qty"] = "1",
             ["units"] = "metric",
             ["temperature_unit"] = "c",
-            ["languagecode"] = "en-us",
+            ["languagecode"] = "de",
             ["currency_code"] = "EUR",
             ["page_number"] = pageNumber.ToString(),
             ["sort_by"] = "distance",
