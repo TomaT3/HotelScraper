@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  ReferenceArea,
 } from "recharts";
 import type { HotelPrices } from "../api/types";
 
@@ -66,6 +67,72 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
   const chartData = Array.from(dateMap.values()).sort((a, b) =>
     a.date.localeCompare(b.date)
   );
+
+  // Compute consecutive weekend spans (Sat–Sun) for background highlighting
+  const weekendSpans = useMemo(() => {
+    const spans: { start: string; end: string }[] = [];
+    let spanStart: string | null = null;
+
+    for (let i = 0; i < chartData.length; i++) {
+      const dateStr = chartData[i].date;
+      const d = new Date(dateStr + "T00:00:00");
+      const day = d.getDay();
+      const isWeekend = day === 0 || day === 6;
+
+      if (isWeekend && spanStart === null) {
+        spanStart = dateStr;
+      }
+
+      if (!isWeekend && spanStart !== null) {
+        spans.push({ start: spanStart, end: chartData[i - 1].date });
+        spanStart = null;
+      }
+    }
+
+    if (spanStart !== null) {
+      spans.push({ start: spanStart, end: chartData[chartData.length - 1].date });
+    }
+
+    return spans;
+  }, [chartData]);
+
+  // Compute data gaps per hotel for dashed bridge lines
+  const hotelGaps = useMemo(() => {
+    const gaps: {
+      hotelId: number;
+      color: string;
+      startDate: string;
+      startPrice: number;
+      endDate: string;
+      endPrice: number;
+    }[] = [];
+
+    for (const hotel of filtered) {
+      const name = hotel.hotel_name;
+      const color = COLORS[filtered.indexOf(hotel) % COLORS.length];
+      let prevIdx: number | null = null;
+
+      for (let i = 0; i < chartData.length; i++) {
+        const price = chartData[i][name];
+        if (price !== undefined) {
+          if (prevIdx !== null && prevIdx < i - 1) {
+            // Gap: at least one null date between prevIdx and i
+            gaps.push({
+              hotelId: hotel.hotel_id,
+              color,
+              startDate: chartData[prevIdx].date,
+              startPrice: chartData[prevIdx][name] as number,
+              endDate: chartData[i].date,
+              endPrice: price as number,
+            });
+          }
+          prevIdx = i;
+        }
+      }
+    }
+
+    return gaps;
+  }, [chartData, filtered]);
 
   // Format date for display
   const formatDate = (dateStr: string) => {
@@ -197,6 +264,16 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
               onClick={handleChartClick}
               style={{ cursor: "pointer" }}
             >
+              {weekendSpans.map((span, i) => (
+                <ReferenceArea
+                  key={`we-${i}`}
+                  x1={span.start}
+                  x2={span.end}
+                  fill="#e5e7eb"
+                  fillOpacity={1}
+                  ifOverflow="hidden"
+                />
+              ))}
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis
                 dataKey="date"
@@ -219,30 +296,60 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
                   strokeWidth={1.5}
                 />
               )}
-              {filtered.map((hotel, i) => (
-                <Line
-                  key={hotel.hotel_id}
-                  type="monotone"
-                  dataKey={hotel.hotel_name}
-                  stroke={COLORS[i % COLORS.length]}
-                  strokeWidth={
-                    hoveredHotel === hotel.hotel_name ? 3 : isMany ? 1.5 : 2
-                  }
-                  strokeOpacity={
-                    hoveredHotel
-                      ? hoveredHotel === hotel.hotel_name
-                        ? 1
-                        : 0.1
-                      : isMany
-                      ? 0.5
-                      : 1
-                  }
-                  dot={false}
-                  connectNulls
-                  activeDot={{ r: hoveredHotel === hotel.hotel_name ? 6 : 4 }}
-                  isAnimationActive={false}
-                />
-              ))}
+              {filtered.map((hotel, i) => {
+                const color = COLORS[i % COLORS.length];
+                const isHovered = hoveredHotel === hotel.hotel_name;
+                const strokeW = isHovered ? 3 : isMany ? 1.5 : 2;
+                const opacity = hoveredHotel
+                  ? isHovered
+                    ? 1
+                    : 0.1
+                  : isMany
+                    ? 0.5
+                    : 1;
+
+                return (
+                  <Line
+                    key={hotel.hotel_id}
+                    type="monotone"
+                    dataKey={hotel.hotel_name}
+                    stroke={color}
+                    strokeWidth={strokeW}
+                    strokeOpacity={opacity}
+                    dot={false}
+                    connectNulls={false}
+                    activeDot={{ r: isHovered ? 6 : 4 }}
+                    isAnimationActive={false}
+                  />
+                );
+              })}
+              {/* Dashed bridge lines across data gaps */}
+              {hotelGaps.map((gap, i) => {
+                const gapName = filtered.find(
+                  (h) => h.hotel_id === gap.hotelId
+                )?.hotel_name;
+                const gapOpacity = hoveredHotel
+                  ? gapName === hoveredHotel
+                    ? 1
+                    : 0.1
+                  : isMany
+                    ? 0.5
+                    : 1;
+
+                return (
+                  <ReferenceLine
+                    key={`gap-${gap.hotelId}-${i}`}
+                    segment={[
+                      { x: gap.startDate, y: gap.startPrice },
+                      { x: gap.endDate, y: gap.endPrice },
+                    ]}
+                    stroke={gap.color}
+                    strokeDasharray="5 4"
+                    strokeWidth={isMany ? 1.2 : 1.6}
+                    strokeOpacity={gapOpacity}
+                  />
+                );
+              })}
             </LineChart>
           </ResponsiveContainer>
             </div>

@@ -184,8 +184,8 @@ export default function App() {
   }, []);
 
   const handleSelectAll = useCallback(() => {
-    const filtered = starFilter
-      ? hotels.filter((h) => h.stars !== null && h.stars >= starFilter)
+    const filtered = starFilter !== null
+      ? hotels.filter((h) => h.stars === starFilter || (starFilter === 0 && h.stars === null))
       : hotels;
     setSelectedIds(new Set(filtered.map((h) => h.id)));
   }, [hotels, starFilter]);
