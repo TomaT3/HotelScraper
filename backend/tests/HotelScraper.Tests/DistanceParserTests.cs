@@ -180,4 +180,62 @@ public class DistanceParserTests
         var result = DistanceParser.ParseDistanceFromLabel(label);
         Assert.Equal(0.0, result);
     }
+
+    // ── German language tests ──
+
+    [Fact]
+    public void German_KmVomZentrumEntfernt_ShouldParse()
+    {
+        var result = DistanceParser.ParseDistanceFromLabel("3,2 km vom Zentrum entfernt");
+        Assert.NotNull(result);
+        Assert.True(Math.Abs(3.2 - result!.Value) < 0.01, $"Expected ~3.2 but got {result.Value}");
+    }
+
+    [Fact]
+    public void German_KmVomStadtzentrumEntfernt_ShouldParse()
+    {
+        var result = DistanceParser.ParseDistanceFromLabel("5 km vom Stadtzentrum entfernt");
+        Assert.NotNull(result);
+        Assert.True(Math.Abs(5.0 - result!.Value) < 0.01);
+    }
+
+    [Fact]
+    public void German_ImZentrum_ShouldReturnZero()
+    {
+        var result = DistanceParser.ParseDistanceFromLabel("Im Zentrum");
+        Assert.Equal(0.0, result);
+    }
+
+    [Fact]
+    public void German_ImStadtzentrum_ShouldReturnZero()
+    {
+        var result = DistanceParser.ParseDistanceFromLabel("Im Stadtzentrum");
+        Assert.Equal(0.0, result);
+    }
+
+    [Fact]
+    public void German_RealisticLabel_WithCommaDecimal()
+    {
+        // Real German accessibilityLabel as returned by Booking API with language=de
+        var label = "Forrest Hostels. Diese Unterkunft ist Teil unseres Preferred-Programms. 8,6 Fabelhaft 800 Bewertungen. \u200eBandra\u202c • \u200e3,2 km vom Zentrum entfernt\u202c \u200e2,5 km vom Strand entfernt\u202c. Bett im Schlafsaal : 1 Bett. 12 EUR.";
+        var result = DistanceParser.ParseDistanceFromLabel(label);
+        Assert.NotNull(result);
+        Assert.True(Math.Abs(3.2 - result!.Value) < 0.01, $"Expected ~3.2 but got {result.Value}");
+    }
+
+    [Fact]
+    public void German_RealisticLabel_ImZentrum()
+    {
+        var label = "EmiLu Design Hotel.\n9,0 Wunderbar 2304 Bewertungen.\n\u200eIm Zentrum\u202c.\nHotelzimmer : 1 Bett.\n120 EUR.";
+        var result = DistanceParser.ParseDistanceFromLabel(label);
+        Assert.Equal(0.0, result);
+    }
+
+    [Fact]
+    public void German_WholeNumber_ShouldParse()
+    {
+        var result = DistanceParser.ParseDistanceFromLabel("12 km vom Zentrum entfernt");
+        Assert.NotNull(result);
+        Assert.True(Math.Abs(12.0 - result!.Value) < 0.01);
+    }
 }
