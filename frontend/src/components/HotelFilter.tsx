@@ -13,7 +13,7 @@ interface Props {
   onToggleFavorite: (id: number) => void;
 }
 
-const STAR_OPTIONS = [null, 3, 4, 5] as const;
+const STAR_OPTIONS = [null, 0, 1, 2, 3, 4, 5] as const;
 
 export default function HotelFilter({
   hotels,
@@ -29,7 +29,7 @@ export default function HotelFilter({
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredHotels = hotels.filter((h) => {
-    if (starFilter !== null && (h.stars === null || h.stars < starFilter)) return false;
+    if (starFilter !== null && h.stars !== starFilter && !(starFilter === 0 && h.stars === null)) return false;
     if (searchQuery && !h.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
@@ -67,7 +67,7 @@ export default function HotelFilter({
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            {s === null ? "Alle" : `${s}+ ★`}
+            {s === null ? "Alle" : `${s} ★`}
           </button>
         ))}
       </div>
@@ -114,9 +114,9 @@ export default function HotelFilter({
                 {favorites.has(hotel.id) ? "⭐" : "☆"}
               </button>
               <span className="truncate flex-1">{hotel.name}</span>
-              {hotel.stars && (
+              {hotel.stars != null && (
                 <span className="text-yellow-500 text-xs flex-shrink-0">
-                  {"★".repeat(hotel.stars)}
+                  {hotel.stars > 0 ? "★".repeat(hotel.stars) : "—"}
                 </span>
               )}
               {hotel.review_score && (
