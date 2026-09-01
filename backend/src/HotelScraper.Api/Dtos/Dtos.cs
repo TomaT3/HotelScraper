@@ -64,3 +64,62 @@ public record VersionInfo(
 public record ConfigResponse(
     [property: JsonPropertyName("dates_per_run")] int DatesPerRun
 );
+
+public record LoginRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password
+);
+
+public record AuthUserOut(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("tenant_id")] int? TenantId,
+    [property: JsonPropertyName("tenant_name")] string? TenantName,
+    [property: JsonPropertyName("city")] string? City
+);
+
+public record WatchlistAddOut(
+    [property: JsonPropertyName("hotel_id")] int HotelId,
+    [property: JsonPropertyName("added")] bool Added
+);
+
+public record WatchlistRemoveOut(
+    [property: JsonPropertyName("hotel_id")] int HotelId,
+    [property: JsonPropertyName("removed")] bool Removed
+);
+
+public record TenantIn(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("city")] string City,
+    [property: JsonPropertyName("is_active")] bool? IsActive
+);
+
+public record TenantOut(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("city")] string City,
+    [property: JsonPropertyName("is_active")] bool IsActive,
+    [property: JsonPropertyName("created_at")] DateTime CreatedAt
+);
+
+public record UserIn(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("tenant_id")] int? TenantId,
+    [property: JsonPropertyName("role")] string? Role,
+    [property: JsonPropertyName("is_active")] bool? IsActive
+);
+
+public record UserOut(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("tenant_id")] int? TenantId,
+    [property: JsonPropertyName("tenant_name")] string? TenantName,
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("is_active")] bool IsActive,
+    [property: JsonPropertyName("created_at")] DateTime CreatedAt
+);
+
+public record ResetPasswordIn(
+    [property: JsonPropertyName("password")] string Password
+);

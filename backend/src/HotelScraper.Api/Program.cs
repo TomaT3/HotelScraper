@@ -2,6 +2,7 @@ using HotelScraper.Api.Configuration;
 using HotelScraper.Api.Data;
 using HotelScraper.Api.Endpoints;
 using HotelScraper.Api.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
@@ -29,6 +30,35 @@ builder.Services.AddHttpClient<BookingApiService>(client =>
 
 // ── Application Services ───────────────────────────────────────────────
 builder.Services.AddScoped<PriceFetcherService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<CurrentTenantService>();
+builder.Services.AddScoped<AuthService>();
+
+// ── Authentication & Authorization ─────────────────────────────────────
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "HotelScraper.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.ExpireTimeSpan = TimeSpan.FromDays(30);
+        options.SlidingExpiration = true;
+        options.Events.OnRedirectToLogin = ctx =>
+        {
+            ctx.Response.StatusCode = 401; // API statt Redirect
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = ctx =>
+        {
+            ctx.Response.StatusCode = 403;
+            return Task.CompletedTask;
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("admin", policy => policy.RequireRole("admin"));
+});
 
 // ── Scheduler (Quartz.NET) ─────────────────────────────────────────────
 if (!string.IsNullOrWhiteSpace(options.RapidApiKey) && options.RapidApiKey != "your_rapidapi_key_here")
@@ -61,7 +91,35 @@ var app = builder.Build();
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.EnsureCreatedAsync();
+    await db.Database.MigrateAsync();
+
+    // Seed initial admin account from environment (only if none exists)
+    var auth = scope.ServiceProvider.GetRequiredService<AuthService>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    var adminEmail = builder.Configuration["ADMIN_EMAIL"] ?? options.AdminEmail;
+    var adminPassword = builder.Configuration["ADMIN_PASSWORD"] ?? options.AdminPassword;
+
+    if (!await db.Users.AnyAsync(u => u.Role == "admin"))
+    {
+        if (string.IsNullOrWhiteSpace(adminEmail) || string.IsNullOrWhiteSpace(adminPassword))
+        {
+            logger.LogWarning(
+                "ADMIN_EMAIL / ADMIN_PASSWORD not set — no admin account seeded. " +
+                "Set both environment variables to create the initial admin.");
+        }
+        else
+        {
+            db.Users.Add(new AppUser
+            {
+                Email = adminEmail.Trim(),
+                PasswordHash = auth.HashPassword(adminPassword),
+                Role = "admin",
+            });
+            await db.SaveChangesAsync();
+            logger.LogInformation("Seeded initial admin account '{Email}'", adminEmail.Trim());
+        }
+    }
 }
 
 // ── Middleware pipeline ────────────────────────────────────────────────
@@ -96,6 +154,10 @@ else
 }
 
 // ── API routes ─────────────────────────────────────────────────────────
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapAuthEndpoints();
 app.MapHotelEndpoints();
 app.MapPriceEndpoints();
 
