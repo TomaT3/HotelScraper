@@ -160,6 +160,8 @@ app.UseAuthorization();
 app.MapAuthEndpoints();
 app.MapHotelEndpoints();
 app.MapPriceEndpoints();
+app.MapWatchlistEndpoints();
+app.MapAdminEndpoints();
 
 app.Run();
 

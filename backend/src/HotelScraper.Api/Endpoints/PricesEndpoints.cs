@@ -13,17 +13,29 @@ public static class PricesEndpoints
     public static RouteGroupBuilder MapPriceEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api");
+        group.RequireAuthorization();
 
         group.MapGet("/prices", async (
             AppDbContext db,
             string? hotel_ids,
             DateOnly? from,
             DateOnly? to,
-            string? room_type) =>
+            string? room_type,
+            [FromServices] CurrentTenantService currentTenant) =>
         {
             var roomType = room_type ?? "double";
+            var ctx = currentTenant.Current;
 
+            // IDOR-Schutz: Hotels IMMER zuerst auf die Tenant-Stadt filtern,
+            // bevor hotel_ids angewendet wird.
             var hotelQuery = db.Hotels.AsQueryable();
+            if (!ctx.IsAdmin)
+            {
+                if (string.IsNullOrWhiteSpace(ctx.City))
+                    return Results.Ok(new List<HotelPrices>());
+                hotelQuery = hotelQuery.Where(h => h.City == ctx.City);
+            }
+
             if (!string.IsNullOrWhiteSpace(hotel_ids))
             {
                 var ids = hotel_ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -63,13 +75,22 @@ public static class PricesEndpoints
             AppDbContext db,
             string? city,
             [FromServices] ScraperOptions options,
+            [FromServices] CurrentTenantService currentTenant,
             [FromServices] ISchedulerFactory? schedulerFactory) =>
         {
             var scheduler = schedulerFactory is not null ? await schedulerFactory.GetScheduler() : null;
+            var ctx = currentTenant.Current;
+
+            // Users are always scoped to their own city; admins may use ?city= (all if omitted)
+            string? effectiveCity;
+            if (ctx.IsAdmin)
+                effectiveCity = city;
+            else
+                effectiveCity = ctx.City;
 
             var hotelQuery = db.Hotels.AsQueryable();
-            if (!string.IsNullOrWhiteSpace(city))
-                hotelQuery = hotelQuery.Where(h => h.City == city);
+            if (!string.IsNullOrWhiteSpace(effectiveCity))
+                hotelQuery = hotelQuery.Where(h => h.City == effectiveCity);
 
             var totalHotels = await hotelQuery.CountAsync();
             var activeHotels = await hotelQuery.CountAsync(h => h.Active);
@@ -78,14 +99,15 @@ public static class PricesEndpoints
             int datesCovered;
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-            if (!string.IsNullOrWhiteSpace(city))
+            if (!string.IsNullOrWhiteSpace(effectiveCity))
             {
+                var cityHotelIds = db.Hotels.Where(h => h.City == effectiveCity).Select(h => h.Id);
                 totalPrices = await db.Prices
-                    .Where(p => db.Hotels.Where(h => h.City == city).Select(h => h.Id).Contains(p.HotelId))
+                    .Where(p => cityHotelIds.Contains(p.HotelId))
                     .CountAsync();
                 datesCovered = await db.Prices
                     .Where(p => p.Date >= today)
-                    .Where(p => db.Hotels.Where(h => h.City == city).Select(h => h.Id).Contains(p.HotelId))
+                    .Where(p => cityHotelIds.Contains(p.HotelId))
                     .Select(p => p.Date)
                     .Distinct()
                     .CountAsync();
@@ -106,7 +128,7 @@ public static class PricesEndpoints
                 : 0;
 
             // Last fetch time
-            var lastFetchKey = !string.IsNullOrWhiteSpace(city) ? $"last_fetch:{city}" : "last_fetch";
+            var lastFetchKey = !string.IsNullOrWhiteSpace(effectiveCity) ? $"last_fetch:{effectiveCity}" : "last_fetch";
             var lastFetchSetting = await db.Settings.FindAsync(lastFetchKey);
             DateTime? lastFetch = null;
             if (lastFetchSetting is not null && DateTime.TryParse(lastFetchSetting.Value, out var parsed))
@@ -127,7 +149,7 @@ public static class PricesEndpoints
             }
 
             return Results.Ok(new StatusOut(
-                city,
+                effectiveCity,
                 totalHotels,
                 activeHotels,
                 totalPrices,
@@ -159,7 +181,7 @@ public static class PricesEndpoints
                 result.PricesSaved,
                 result.Errors
             ));
-        });
+        }).RequireAuthorization("admin");
 
         return group;
     }
