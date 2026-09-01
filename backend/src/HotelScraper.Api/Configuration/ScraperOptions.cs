@@ -12,6 +12,10 @@ public class ScraperOptions
     public int FetchHour { get; set; } = 3;
     public string SearchCities { get; set; } = "Stuttgart";
 
+    // Optional fallback for the initial admin seed (primary source: ADMIN_EMAIL / ADMIN_PASSWORD env vars)
+    public string AdminEmail { get; set; } = "";
+    public string AdminPassword { get; set; } = "";
+
 
     public List<string> CityList
     {

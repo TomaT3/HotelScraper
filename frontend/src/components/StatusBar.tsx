@@ -3,7 +3,7 @@ import type { Status } from "../api/types";
 interface Props {
   status: Status | null;
   loading: boolean;
-  onFetch: () => void;
+  onFetch?: () => void;
   fetching: boolean;
 }
 
@@ -71,13 +71,15 @@ export default function StatusBar({
             </span>
           </div>
         </div>
-        <button
-          onClick={onFetch}
-          disabled={fetching}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-        >
-          {fetching ? "Lädt..." : "Jetzt abrufen"}
-        </button>
+        {onFetch && (
+          <button
+            onClick={onFetch}
+            disabled={fetching}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+          >
+            {fetching ? "Lädt..." : "Jetzt abrufen"}
+          </button>
+        )}
       </div>
     </div>
   );

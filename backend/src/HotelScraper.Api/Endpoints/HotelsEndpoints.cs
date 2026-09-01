@@ -1,6 +1,7 @@
 using HotelScraper.Api.Configuration;
 using HotelScraper.Api.Data;
 using HotelScraper.Api.Dtos;
+using HotelScraper.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,12 +11,31 @@ public static class HotelsEndpoints
 {
     public static RouteGroupBuilder MapHotelEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api");
-
-        group.MapGet("/cities", async (AppDbContext db, [FromServices] ScraperOptions options) =>
+        // Public meta endpoints (no auth required — used by the frontend pre-login)
+        var publicGroup = app.MapGroup("/api");
+        publicGroup.MapGet("/version", () =>
         {
+            var version = Environment.GetEnvironmentVariable("APP_VERSION");
+            if (string.IsNullOrWhiteSpace(version) || version == "unknown")
+                version = typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+            return Results.Ok(new VersionInfo(version));
+        });
+
+        publicGroup.MapGet("/config", ([FromServices] ScraperOptions options) =>
+            Results.Ok(new ConfigResponse(options.DatesPerRun))
+        );
+
+        var group = app.MapGroup("/api");
+        group.RequireAuthorization();
+
+        group.MapGet("/cities", async (AppDbContext db, [FromServices] ScraperOptions options, [FromServices] CurrentTenantService currentTenant) =>
+        {
+            var ctx = currentTenant.Current;
+
+            IEnumerable<string> cities = ctx.IsAdmin ? options.CityList : ctx.Cities;
+
             var result = new List<CityOut>();
-            foreach (var city in options.CityList)
+            foreach (var city in cities)
             {
                 var label = await db.Settings
                     .Where(s => s.Key == $"dest_label:{city}")
@@ -26,10 +46,29 @@ public static class HotelsEndpoints
             return Results.Ok(result);
         });
 
-        group.MapGet("/hotels", async (AppDbContext db, string city) =>
+        group.MapGet("/hotels", async (AppDbContext db, string? city, [FromServices] CurrentTenantService currentTenant) =>
         {
-            var hotels = await db.Hotels
-                .Where(h => h.City == city)
+            var ctx = currentTenant.Current;
+
+            // Users always see only their own cities; admins may choose via ?city= (all if omitted)
+            var query = db.Hotels.AsQueryable();
+            if (ctx.IsAdmin)
+            {
+                if (!string.IsNullOrWhiteSpace(city))
+                    query = query.Where(h => h.City == city);
+            }
+            else
+            {
+                query = query.Where(h => ctx.Cities.Contains(h.City));
+                // Optional ?city= only applies when it is part of the user's cities,
+                // otherwise the result is empty (foreign city must not leak data).
+                if (!string.IsNullOrWhiteSpace(city) && !ctx.Cities.Contains(city))
+                    return Results.Ok(new List<HotelOut>());
+                if (!string.IsNullOrWhiteSpace(city))
+                    query = query.Where(h => h.City == city);
+            }
+
+            var hotels = await query
                 .OrderBy(h => h.Name)
                 .Select(h => new HotelOut(
                     h.Id, h.BookingId, h.Name, h.Address, h.Stars,
@@ -53,19 +92,7 @@ public static class HotelsEndpoints
                 hotel.Id, hotel.BookingId, hotel.Name, hotel.Address, hotel.Stars,
                 hotel.ReviewScore, hotel.ImageUrl, hotel.DistanceKm, hotel.Active, hotel.City
             ));
-        });
-
-        group.MapGet("/version", () =>
-        {
-            var version = Environment.GetEnvironmentVariable("APP_VERSION");
-            if (string.IsNullOrWhiteSpace(version) || version == "unknown")
-                version = typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "unknown";
-            return Results.Ok(new VersionInfo(version));
-        });
-
-        group.MapGet("/config", ([FromServices] ScraperOptions options) =>
-            Results.Ok(new ConfigResponse(options.DatesPerRun))
-        );
+        }).RequireAuthorization("admin");
 
         return group;
     }

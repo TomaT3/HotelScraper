@@ -1,15 +1,74 @@
-import type { City, ConfigResponse, Hotel, HotelPrices, Status, FetchResult, VersionInfo } from "./types";
+import type { AuthUser, City, ConfigResponse, Hotel, HotelPrices, Status, FetchResult, VersionInfo } from "./types";
 
 const BASE = "/api";
 
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+/**
+ * Fired whenever an authenticated API call returns 401 (session expired).
+ * The AuthContext listens for this and returns the UI to the login screen.
+ */
+export const AUTH_UNAUTHORIZED_EVENT = "auth:unauthorized";
+
+function notifyUnauthorized() {
+  window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT));
+}
+
+async function fetchJson<T>(
+  url: string,
+  init?: RequestInit,
+  opts?: { silent401?: boolean }
+): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
+    if (res.status === 401 && !opts?.silent401) {
+      notifyUnauthorized();
+    }
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
   }
   return res.json();
 }
+
+// ── Auth ────────────────────────────────────────────────────────────────
+
+export async function login(email: string, password: string): Promise<AuthUser> {
+  return fetchJson<AuthUser>(
+    `${BASE}/auth/login`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    },
+    { silent401: true }
+  );
+}
+
+export async function logout(): Promise<void> {
+  await fetch(`${BASE}/auth/logout`, { method: "POST" });
+}
+
+export async function getMe(): Promise<AuthUser> {
+  return fetchJson<AuthUser>(`${BASE}/auth/me`);
+}
+
+// ── Watchlist ───────────────────────────────────────────────────────────
+
+export async function getWatchlist(): Promise<number[]> {
+  return fetchJson<number[]>(`${BASE}/watchlist`);
+}
+
+export async function addToWatchlist(hotelId: number): Promise<{ hotel_id: number; added: boolean }> {
+  return fetchJson<{ hotel_id: number; added: boolean }>(`${BASE}/watchlist/${hotelId}`, {
+    method: "PUT",
+  });
+}
+
+export async function removeFromWatchlist(hotelId: number): Promise<{ hotel_id: number; removed: boolean }> {
+  return fetchJson<{ hotel_id: number; removed: boolean }>(`${BASE}/watchlist/${hotelId}`, {
+    method: "DELETE",
+  });
+}
+
+// ── Data ────────────────────────────────────────────────────────────────
 
 export async function getCities(): Promise<City[]> {
   return fetchJson<City[]>(`${BASE}/cities`);

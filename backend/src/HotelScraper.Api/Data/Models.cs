@@ -91,3 +91,88 @@ public class Setting
     [Column("value")]
     public string Value { get; set; } = "";
 }
+
+[Table("tenants")]
+public class Tenant
+{
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    [Column("id")]
+    public int Id { get; set; }
+
+    [Required]
+    [MaxLength(200)]
+    [Column("name")]
+    public string Name { get; set; } = "";
+
+    [Column("is_active")]
+    public bool IsActive { get; set; } = true;
+
+    [Column("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+// One tenant (hotel group) may see 1..N cities — each row is one city assignment.
+[Table("tenant_cities")]
+public class TenantCity
+{
+    [Column("tenant_id")]
+    public int TenantId { get; set; }
+
+    [Required]
+    [MaxLength(100)]
+    [Column("city")]
+    public string City { get; set; } = "";
+}
+
+[Index(nameof(Email), IsUnique = true)]
+[Table("users")]
+public class AppUser
+{
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    [Column("id")]
+    public int Id { get; set; }
+
+    [Required]
+    [MaxLength(256)]
+    [Column("email")]
+    public string Email { get; set; } = "";
+
+    [Required]
+    [Column("password_hash")]
+    public string PasswordHash { get; set; } = "";
+
+    [Column("tenant_id")]
+    public int? TenantId { get; set; }
+
+    [Required]
+    [MaxLength(20)]
+    [Column("role")]
+    public string Role { get; set; } = "user";
+
+    [Column("is_active")]
+    public bool IsActive { get; set; } = true;
+
+    [Column("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+[Index(nameof(TenantId), nameof(HotelId), IsUnique = true)]
+[Table("watchlist_items")]
+public class WatchlistItem
+{
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    [Column("id")]
+    public int Id { get; set; }
+
+    [Column("tenant_id")]
+    public int TenantId { get; set; }
+
+    [Column("hotel_id")]
+    public int HotelId { get; set; }
+
+    [Column("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

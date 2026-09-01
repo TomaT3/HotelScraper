@@ -1,37 +1,24 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import StatusBar from "./components/StatusBar";
 import HotelFilter from "./components/HotelFilter";
 import DateRangePicker from "./components/DateRangePicker";
 import HotelChart from "./components/HotelChart";
 import CitySelector from "./components/CitySelector";
 import { ChevronDown } from "./components/Icons";
-import { getCities, getHotels, getPrices, getStatus, getVersion, getConfig, triggerFetch } from "./api/client";
+import { useAuth } from "./auth/AuthContext";
+import {
+  addToWatchlist,
+  getCities,
+  getConfig,
+  getHotels,
+  getPrices,
+  getStatus,
+  getVersion,
+  getWatchlist,
+  removeFromWatchlist,
+  triggerFetch,
+} from "./api/client";
 import type { City, Hotel, HotelPrices, Status, FetchResult } from "./api/types";
-
-const FAVORITES_KEY = "hotelFavorites";
-
-function loadFavorites(): Map<string, Set<number>> {
-  try {
-    const raw = localStorage.getItem(FAVORITES_KEY);
-    if (!raw) return new Map();
-    const parsed = JSON.parse(raw) as Record<string, number[]>;
-    const map = new Map<string, Set<number>>();
-    for (const [city, ids] of Object.entries(parsed)) {
-      map.set(city, new Set(ids));
-    }
-    return map;
-  } catch {
-    return new Map();
-  }
-}
-
-function saveFavorites(favorites: Map<string, Set<number>>) {
-  const obj: Record<string, number[]> = {};
-  for (const [city, ids] of favorites) {
-    obj[city] = Array.from(ids);
-  }
-  localStorage.setItem(FAVORITES_KEY, JSON.stringify(obj));
-}
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -43,7 +30,89 @@ function datesPerRunEndStr(datesPerRun: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function LoginForm() {
+  const { login } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(email, password);
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message.includes("401")
+          ? "E-Mail oder Passwort ist falsch."
+          : "Anmeldung fehlgeschlagen. Bitte später erneut versuchen."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="w-full max-w-sm bg-white rounded-xl shadow p-6 space-y-4">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">🏨 Hotel Price Tracker</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Bitte melden Sie sich mit Ihrem Konto an.
+          </p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700">
+              E-Mail
+            </label>
+            <input
+              id="login-email"
+              type="email"
+              required
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="name@hotel.de"
+            />
+          </div>
+          <div>
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
+              Passwort
+            </label>
+            <input
+              id="login-password"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+          >
+            {submitting ? "Anmelden..." : "Anmelden"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const { user, loading, logout } = useAuth();
   const [cities, setCities] = useState<City[]>([]);
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -54,27 +123,21 @@ export default function App() {
   const [datesPerRun, setDatesPerRun] = useState<number>(15);
   const [dateFrom, setDateFrom] = useState(todayStr());
   const [dateTo, setDateTo] = useState(datesPerRunEndStr(15));
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [favorites, setFavorites] = useState<Map<string, Set<number>>>(() => loadFavorites());
+  const [favorites, setFavorites] = useState<Map<string, Set<number>>>(new Map());
   const [version, setVersion] = useState<string | null>(null);
   const [roomType, setRoomType] = useState<"single" | "double">("double");
 
-  // Persist favorites to localStorage whenever they change
-  useEffect(() => {
-    saveFavorites(favorites);
-  }, [favorites]);
+  const isAdmin = user?.role === "admin";
 
-  // Load version and config on mount
+  // Load version and config on mount (public endpoints)
   useEffect(() => {
     async function load() {
       try {
-        const [v, cfg] = await Promise.all([
-          getVersion(),
-          getConfig(),
-        ]);
+        const [v, cfg] = await Promise.all([getVersion(), getConfig()]);
         setVersion(v.version);
         setDatesPerRun(cfg.dates_per_run);
         setDateTo(datesPerRunEndStr(cfg.dates_per_run));
@@ -85,11 +148,36 @@ export default function App() {
     load();
   }, []);
 
-  // Load cities on mount
+  // Load watchlist from server once logged in (server is source of truth)
   useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const ids = await getWatchlist();
+        if (cancelled) return;
+        const map = new Map<string, Set<number>>();
+        // The watchlist is tenant-wide; key the favorites per city so the UI
+        // can look them up per selected city.
+        (user.cities ?? []).forEach((c) => map.set(c, new Set(ids)));
+        setFavorites(map);
+      } catch (e) {
+        console.error("Failed to load watchlist:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // Load cities once logged in
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
     async function loadCities() {
       try {
         const c = await getCities();
+        if (cancelled) return;
         setCities(c);
         if (c.length > 0) {
           setSelectedCity(c[0].name);
@@ -99,7 +187,10 @@ export default function App() {
       }
     }
     loadCities();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // Load hotels + status when city changes
   useEffect(() => {
@@ -107,7 +198,7 @@ export default function App() {
     let cancelled = false;
 
     async function load() {
-      setLoading(true);
+      setLoadingData(true);
       try {
         const [h, s] = await Promise.all([
           getHotels(selectedCity),
@@ -133,13 +224,14 @@ export default function App() {
       } catch (e) {
         console.error("Failed to load data for city:", e);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadingData(false);
       }
     }
     load();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCity]);
 
   // Fetch prices when selection or dates change
@@ -194,24 +286,42 @@ export default function App() {
     setSelectedIds(new Set());
   }, []);
 
-  const handleToggleFavorite = useCallback((id: number) => {
-    setFavorites((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(selectedCity);
-      const cityFavorites = existing ? new Set(existing) : new Set<number>();
-      if (cityFavorites.has(id)) {
-        cityFavorites.delete(id);
-      } else {
-        cityFavorites.add(id);
+  const handleToggleFavorite = useCallback(
+    async (id: number) => {
+      if (!user?.cities?.length || !selectedCity) return;
+      const city = selectedCity;
+      const wasFavorite = favorites.get(city)?.has(id) ?? false;
+
+      // Optimistic update
+      setFavorites((prev) => {
+        const next = new Map(prev);
+        const set = new Set(next.get(city) ?? []);
+        if (wasFavorite) set.delete(id);
+        else set.add(id);
+        if (set.size > 0) next.set(city, set);
+        else next.delete(city);
+        return next;
+      });
+
+      try {
+        if (wasFavorite) await removeFromWatchlist(id);
+        else await addToWatchlist(id);
+      } catch (e) {
+        console.error("Watchlist update failed:", e);
+        // Revert on error
+        setFavorites((prev) => {
+          const next = new Map(prev);
+          const set = new Set(next.get(city) ?? []);
+          if (wasFavorite) set.add(id);
+          else set.delete(id);
+          if (set.size > 0) next.set(city, set);
+          else next.delete(city);
+          return next;
+        });
       }
-      if (cityFavorites.size > 0) {
-        next.set(selectedCity, cityFavorites);
-      } else {
-        next.delete(selectedCity);
-      }
-      return next;
-    });
-  }, [selectedCity]);
+    },
+    [favorites, user]
+  );
 
   const handleFetch = useCallback(async () => {
     setFetching(true);
@@ -242,6 +352,30 @@ export default function App() {
     setDateTo(to);
   }, []);
 
+  const handleLogout = useCallback(async () => {
+    await logout();
+    setCities([]);
+    setSelectedCity("");
+    setHotels([]);
+    setPrices([]);
+    setStatus(null);
+    setSelectedIds(new Set());
+    setFavorites(new Map());
+    setFetchResult(null);
+  }, [logout]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-400 text-sm">
+        Wird geladen…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginForm />;
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-3 sm:space-y-4">
       {/* Header */}
@@ -254,13 +388,27 @@ export default function App() {
           selectedCity={selectedCity}
           onCityChange={handleCityChange}
         />
+        <div className="ml-auto flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-sm font-medium text-gray-700">{user.email}</div>
+            <div className="text-xs text-gray-400">
+              {user.role === "admin" ? "Administrator" : user.tenant_name ?? user.cities?.join(", ") ?? "Benutzer"}
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+          >
+            Abmelden
+          </button>
+        </div>
       </div>
 
       {/* Status bar */}
       <StatusBar
         status={status}
-        loading={loading}
-        onFetch={handleFetch}
+        loading={loadingData}
+        onFetch={isAdmin ? handleFetch : undefined}
         fetching={fetching}
       />
 

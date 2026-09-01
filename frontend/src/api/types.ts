@@ -56,3 +56,11 @@ export interface VersionInfo {
 export interface ConfigResponse {
   dates_per_run: number;
 }
+
+export interface AuthUser {
+  email: string;
+  role: string;
+  tenant_id: number | null;
+  tenant_name: string | null;
+  cities: string[];
+}
