@@ -213,7 +213,17 @@ public class PriceFetcherService
 
         await using var db = await _dbFactory.CreateDbContextAsync();
 
-        var destId = await GetDestIdAsync(db, city);
+        string? destId;
+        try
+        {
+            destId = await GetDestIdAsync(db, city);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[{City}] Failed to resolve destination id", city);
+            errors.Add($"{city}: destination lookup failed ({ex.Message})");
+            return new FetchResultDto(0, 0, 0, errors);
+        }
 
         dates ??= GetNextDates(maxDates ?? _options.DatesPerRun);
 
