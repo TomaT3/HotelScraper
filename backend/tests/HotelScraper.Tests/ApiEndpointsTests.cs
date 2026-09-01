@@ -928,6 +928,59 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task PatchUser_DeactivatesUser()
+    {
+        var client = AdminClient();
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+
+        var response = await client.PatchAsJsonAsync($"/api/admin/users/{user.Id}", new { is_active = false });
+        response.EnsureSuccessStatusCode();
+        var data = await response.Content.ReadFromJsonAsync<UserResponse>();
+        Assert.NotNull(data);
+        Assert.False(data!.IsActive);
+    }
+
+    [Fact]
+    public async Task PatchUser_SelfDeactivation_Returns400()
+    {
+        // AdminClient uses X-Test-UserId=1 — the seeded admin account.
+        var client = AdminClient();
+        var response = await client.PatchAsJsonAsync("/api/admin/users/1", new { is_active = false });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchUser_AsUser_Returns403()
+    {
+        var client = UserClient();
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+
+        var response = await client.PatchAsJsonAsync($"/api/admin/users/{user.Id}", new { is_active = false });
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchUser_InvalidRole_Returns400()
+    {
+        var client = AdminClient();
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+
+        var response = await client.PatchAsJsonAsync($"/api/admin/users/{user.Id}", new { role = "superuser" });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchUser_UserRoleRequiresTenant_Returns400()
+    {
+        // Switching an admin to role "user" requires an explicit active tenant_id.
+        var client = AdminClient();
+        var admin = await _db.Users.FirstAsync(u => u.Email == "admin@test.local");
+
+        var response = await client.PatchAsJsonAsync($"/api/admin/users/{admin.Id}", new { role = "user" });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     // ── Status ──────────────────────────────────────────────────────
 
     [Fact]
