@@ -1,4 +1,18 @@
-import type { AuthUser, City, ConfigResponse, Hotel, HotelPrices, Status, FetchResult, VersionInfo } from "./types";
+import type {
+  AuthUser,
+  City,
+  ConfigResponse,
+  Hotel,
+  HotelPrices,
+  Status,
+  FetchResult,
+  VersionInfo,
+  Tenant,
+  TenantInput,
+  UserAdmin,
+  UserInput,
+  UserPatchInput,
+} from "./types";
 
 const BASE = "/api";
 
@@ -126,4 +140,57 @@ export async function triggerFetch(city?: string, maxDates?: number): Promise<Fe
   if (maxDates) params.set("max_dates", String(maxDates));
   const qs = params.toString();
   return fetchJson<FetchResult>(`${BASE}/fetch${qs ? `?${qs}` : ""}`, { method: "POST" });
+}
+
+// ── Admin: Tenants & Users ─────────────────────────────────────────────
+
+export async function getTenants(): Promise<Tenant[]> {
+  return fetchJson<Tenant[]>(`${BASE}/admin/tenants`);
+}
+
+export async function createTenant(data: TenantInput): Promise<Tenant> {
+  return fetchJson<Tenant>(`${BASE}/admin/tenants`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function patchTenant(id: number, data: TenantInput): Promise<Tenant> {
+  return fetchJson<Tenant>(`${BASE}/admin/tenants/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getUsers(): Promise<UserAdmin[]> {
+  return fetchJson<UserAdmin[]>(`${BASE}/admin/users`);
+}
+
+export async function createUser(data: UserInput): Promise<UserAdmin> {
+  return fetchJson<UserAdmin>(`${BASE}/admin/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function patchUser(id: number, data: UserPatchInput): Promise<UserAdmin> {
+  return fetchJson<UserAdmin>(`${BASE}/admin/users/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function resetUserPassword(
+  id: number,
+  password: string
+): Promise<{ ok: boolean; id: number }> {
+  return fetchJson<{ ok: boolean; id: number }>(`${BASE}/admin/users/${id}/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
 }
