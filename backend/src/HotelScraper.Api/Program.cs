@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
+using System.Security.Claims;
 using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -53,6 +54,58 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         {
             ctx.Response.StatusCode = 403;
             return Task.CompletedTask;
+        };
+
+        // Re-validate the principal against the database on every request. The cookie
+        // itself is valid for 30 days (sliding), so without this check a deactivated
+        // user — or a user of a deactivated tenant — would keep access until expiry.
+        options.Events.OnValidatePrincipal = async ctx =>
+        {
+            var userIdClaim = ctx.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
+            {
+                ctx.RejectPrincipal();
+                ctx.HttpContext.Response.Cookies.Delete(options.Cookie.Name);
+                return;
+            }
+
+            // Resolve a fresh DbContext via the factory — never capture a scoped
+            // service here (captive dependency).
+            var dbFactory = ctx.HttpContext.RequestServices.GetRequiredService<IDbContextFactory<AppDbContext>>();
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user is null || !user.IsActive)
+            {
+                ctx.RejectPrincipal();
+                ctx.HttpContext.Response.Cookies.Delete(options.Cookie.Name);
+                return;
+            }
+
+            if (user.TenantId.HasValue)
+            {
+                var tenant = await db.Tenants.FindAsync(user.TenantId.Value);
+                if (tenant is null || !tenant.IsActive)
+                {
+                    ctx.RejectPrincipal();
+                    ctx.HttpContext.Response.Cookies.Delete(options.Cookie.Name);
+                    return;
+                }
+
+                // Refresh the city claim so tenant city changes take effect immediately.
+                if (ctx.Principal?.Identity is ClaimsIdentity identity)
+                {
+                    var oldCityClaim = identity.FindFirst("city");
+                    if (oldCityClaim is null || oldCityClaim.Value != tenant.City)
+                    {
+                        if (oldCityClaim is not null)
+                            identity.RemoveClaim(oldCityClaim);
+                        identity.AddClaim(new Claim("city", tenant.City));
+                        ctx.ReplacePrincipal(ctx.Principal!);
+                        ctx.ShouldRenew = true;
+                    }
+                }
+            }
         };
     });
 builder.Services.AddAuthorization(options =>

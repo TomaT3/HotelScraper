@@ -346,6 +346,67 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // ── Deactivation & claim refresh (per-request validation via real cookie) ──
+
+    [Fact]
+    public async Task DeactivatedUser_SubsequentRequestReturns401()
+    {
+        // Real cookie login (no X-Test-Auth header) on a dedicated client
+        var client = _factory.CreateClient();
+        var login = await client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "UserPass1!" });
+        login.EnsureSuccessStatusCode();
+
+        // Deactivate the user after the cookie was issued
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+        user.IsActive = false;
+        await _db.SaveChangesAsync();
+
+        // The still-valid cookie must no longer grant access
+        var response = await client.GetAsync("/api/hotels?city=Stuttgart");
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeactivatedTenant_UserRequestReturns401()
+    {
+        var client = _factory.CreateClient();
+        var login = await client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "UserPass1!" });
+        login.EnsureSuccessStatusCode();
+
+        // Deactivate the user's tenant after login
+        var tenant = await _db.Tenants.FirstAsync(t => t.Id == 1);
+        tenant.IsActive = false;
+        await _db.SaveChangesAsync();
+
+        var response = await client.GetAsync("/api/hotels?city=Stuttgart");
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CityClaim_RefreshedAfterTenantCityChange()
+    {
+        var client = _factory.CreateClient();
+        var login = await client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "UserPass1!" });
+        login.EnsureSuccessStatusCode();
+
+        // Admin changes the tenant's city after login
+        var tenant = await _db.Tenants.FirstAsync(t => t.Id == 1);
+        tenant.City = "Berlin";
+        await _db.SaveChangesAsync();
+
+        // The refreshed city claim must scope the user to the new city:
+        // asking for Berlin returns the Berlin hotel, not the stale Stuttgart data.
+        var response = await client.GetAsync("/api/hotels?city=Berlin");
+        response.EnsureSuccessStatusCode();
+        var data = await response.Content.ReadFromJsonAsync<List<HotelResponse>>();
+        Assert.NotNull(data);
+        Assert.Single(data!);
+        Assert.All(data!, h => Assert.Equal("Berlin", h.City));
+    }
+
     // ── Cities ──────────────────────────────────────────────────────
 
     [Fact]
