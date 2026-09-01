@@ -40,9 +40,14 @@ public class AuthService
         {
             claims.Add(new Claim("tenant_id", user.TenantId.Value.ToString()));
 
-            var tenant = await _db.Tenants.FindAsync(new object?[] { user.TenantId.Value }, ct);
-            if (tenant is not null)
-                claims.Add(new Claim("city", tenant.City));
+            // Multi-city: one "city" claim per city the tenant is assigned to.
+            var cities = await _db.TenantCities
+                .Where(tc => tc.TenantId == user.TenantId.Value)
+                .Select(tc => tc.City)
+                .ToListAsync(ct);
+
+            foreach (var city in cities)
+                claims.Add(new Claim("city", city));
         }
 
         return claims;

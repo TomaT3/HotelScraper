@@ -62,5 +62,5 @@ export interface AuthUser {
   role: string;
   tenant_id: number | null;
   tenant_name: string | null;
-  city: string | null;
+  cities: string[];
 }

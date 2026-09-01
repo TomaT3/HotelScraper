@@ -18,13 +18,30 @@ namespace HotelScraper.Api.Migrations
                     id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
                     name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
-                    city = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     is_active = table.Column<bool>(type: "INTEGER", nullable: false),
                     created_at = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_tenants", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "tenant_cities",
+                columns: table => new
+                {
+                    tenant_id = table.Column<int>(type: "INTEGER", nullable: false),
+                    city = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_tenant_cities", x => new { x.tenant_id, x.city });
+                    table.ForeignKey(
+                        name: "FK_tenant_cities_tenants_tenant_id",
+                        column: x => x.tenant_id,
+                        principalTable: "tenants",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -104,6 +121,9 @@ namespace HotelScraper.Api.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "tenant_cities");
+
             migrationBuilder.DropTable(
                 name: "users");
 

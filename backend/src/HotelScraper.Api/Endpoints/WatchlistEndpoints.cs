@@ -43,9 +43,9 @@ public static class WatchlistEndpoints
             if (hotel is null)
                 return Results.NotFound(new { detail = "Hotel not found" });
 
-            // Hotel must belong to the tenant's city
-            if (!ctx.IsAdmin && hotel.City != ctx.City)
-                return Results.BadRequest(new { detail = "Hotel does not belong to your city" });
+            // Hotel must belong to one of the tenant's cities
+            if (!ctx.IsAdmin && !ctx.Cities.Contains(hotel.City))
+                return Results.BadRequest(new { detail = "Hotel does not belong to your cities" });
 
             var exists = await db.WatchlistItems.AnyAsync(w => w.TenantId == ctx.TenantId.Value && w.HotelId == hotelId);
             if (!exists)

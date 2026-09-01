@@ -65,7 +65,11 @@ public class TestAuthHandler : AuthenticationHandler<TestAuthHandlerOptions>
         if (Request.Headers.TryGetValue(TenantIdHeader, out var tenantId) && tenantId.Count > 0)
             claims.Add(new Claim("tenant_id", tenantId[0]!));
         if (Request.Headers.TryGetValue(CityHeader, out var city) && city.Count > 0)
-            claims.Add(new Claim("city", city[0]!));
+        {
+            // Comma-separated header → one "city" claim per city (multi-city tenants)
+            foreach (var c in city[0]!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                claims.Add(new Claim("city", c));
+        }
 
         var identity = new ClaimsIdentity(claims, SchemeName);
         var principal = new ClaimsPrincipal(identity);
@@ -116,7 +120,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.Configure<ScraperOptions>(opts =>
             {
                 opts.RapidApiKey = "test-api-key-12345";
-                opts.SearchCities = "Stuttgart";
+                opts.SearchCities = "Stuttgart,Tübingen";
                 opts.DatesPerRun = 5;
                 opts.FetchHour = 3;
             });
@@ -131,18 +135,18 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>
-    /// Creates a client authenticated as the given role/tenant/city via the test handler.
-    /// Pass role "admin" without tenant/city for a global admin.
+    /// Creates a client authenticated as the given role/tenant/cities via the test handler.
+    /// Pass role "admin" without tenant/cities for a global admin.
     /// </summary>
-    public HttpClient CreateClientAs(string role = "user", int? tenantId = null, string? city = null, int? userId = null)
+    public HttpClient CreateClientAs(string role = "user", int? tenantId = null, IEnumerable<string>? cities = null, int? userId = null)
     {
         var client = CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.AuthHeader, "true");
         client.DefaultRequestHeaders.Add(TestAuthHandler.RoleHeader, role);
         if (tenantId.HasValue)
             client.DefaultRequestHeaders.Add(TestAuthHandler.TenantIdHeader, tenantId.Value.ToString());
-        if (city is not null)
-            client.DefaultRequestHeaders.Add(TestAuthHandler.CityHeader, city);
+        if (cities is not null && cities.Any())
+            client.DefaultRequestHeaders.Add(TestAuthHandler.CityHeader, string.Join(",", cities));
         if (userId.HasValue)
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, userId.Value.ToString());
         return client;
@@ -190,10 +194,20 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         _db.Hotels.AddRange(
             new Hotel { BookingId = "1001", Name = "Stuttgart Grand Hotel", City = "Stuttgart", Stars = 5, Active = true },
             new Hotel { BookingId = "1002", Name = "Hotel am Schlossgarten", City = "Stuttgart", Stars = 4, Active = true },
+            new Hotel { BookingId = "3001", Name = "Hotel am Neckar Tübingen", City = "Tübingen", Stars = 4, Active = true },
             new Hotel { BookingId = "2001", Name = "Berlin Central Hotel", City = "Berlin", Stars = 4, Active = false }
         );
 
-        _db.Tenants.Add(new Tenant { Name = "Stuttgart Hotels GmbH", City = "Stuttgart" });
+        var tenantStuttgart = new Tenant { Name = "Stuttgart Hotels GmbH" };
+        var tenantMulti = new Tenant { Name = "Stuttgart-Tübingen Gruppe" };
+        _db.Tenants.AddRange(tenantStuttgart, tenantMulti);
+        await _db.SaveChangesAsync();
+
+        _db.TenantCities.AddRange(
+            new TenantCity { TenantId = tenantStuttgart.Id, City = "Stuttgart" },
+            new TenantCity { TenantId = tenantMulti.Id, City = "Stuttgart" },
+            new TenantCity { TenantId = tenantMulti.Id, City = "Tübingen" }
+        );
 
         _db.Users.Add(new AppUser
         {
@@ -206,16 +220,17 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
             Email = "user@stuttgart.test",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("UserPass1!"),
             Role = "user",
-            TenantId = 1,
+            TenantId = tenantStuttgart.Id,
         });
 
         _db.Settings.Add(new Setting { Key = "dest_label:Stuttgart", Value = "Stuttgart, Germany" });
+        _db.Settings.Add(new Setting { Key = "dest_label:Tübingen", Value = "Tübingen, Germany" });
 
         await _db.SaveChangesAsync();
 
-        // Seed prices for Stuttgart hotels
+        // Seed prices for Stuttgart and Tübingen hotels
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var hotels = await _db.Hotels.Where(h => h.City == "Stuttgart").ToListAsync();
+        var hotels = await _db.Hotels.Where(h => h.City == "Stuttgart" || h.City == "Tübingen").ToListAsync();
         foreach (var hotel in hotels)
         {
             for (int i = 0; i < 15; i++)
@@ -241,7 +256,8 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         await _db.SaveChangesAsync();
     }
 
-    private HttpClient UserClient() => _factory.CreateClientAs("user", tenantId: 1, city: "Stuttgart");
+    private HttpClient UserClient() => _factory.CreateClientAs("user", tenantId: 1, cities: ["Stuttgart"]);
+    private HttpClient MultiCityClient() => _factory.CreateClientAs("user", tenantId: 2, cities: ["Stuttgart", "Tübingen"]);
     private HttpClient AdminClient() => _factory.CreateClientAs("admin");
 
     // ── Version & Config (public) ───────────────────────────────────
@@ -289,7 +305,7 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
     }
 
     [Fact]
-    public async Task Login_UserWithTenant_ReturnsCityAndTenantName()
+    public async Task Login_UserWithTenant_ReturnsCitiesAndTenantName()
     {
         var response = await _client.PostAsJsonAsync("/api/auth/login",
             new { email = "user@stuttgart.test", password = "UserPass1!" });
@@ -299,7 +315,7 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         Assert.NotNull(data);
         Assert.Equal("user", data!.Role);
         Assert.Equal(1, data.TenantId);
-        Assert.Equal("Stuttgart", data.City);
+        Assert.Contains("Stuttgart", data.Cities);
         Assert.Equal("Stuttgart Hotels GmbH", data.TenantName);
     }
 
@@ -392,19 +408,21 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
             new { email = "user@stuttgart.test", password = "UserPass1!" });
         login.EnsureSuccessStatusCode();
 
-        // Admin changes the tenant's city after login
+        // Admin replaces the tenant's cities after login: Stuttgart → Tübingen
         var tenant = await _db.Tenants.FirstAsync(t => t.Id == 1);
-        tenant.City = "Berlin";
+        var oldCities = await _db.TenantCities.Where(tc => tc.TenantId == tenant.Id).ToListAsync();
+        _db.TenantCities.RemoveRange(oldCities);
+        _db.TenantCities.Add(new TenantCity { TenantId = tenant.Id, City = "Tübingen" });
         await _db.SaveChangesAsync();
 
-        // The refreshed city claim must scope the user to the new city:
-        // asking for Berlin returns the Berlin hotel, not the stale Stuttgart data.
-        var response = await client.GetAsync("/api/hotels?city=Berlin");
+        // The refreshed city claims must scope the user to the new city:
+        // asking for hotels now returns the Tübingen hotel, not the stale Stuttgart data.
+        var response = await client.GetAsync("/api/hotels");
         response.EnsureSuccessStatusCode();
         var data = await response.Content.ReadFromJsonAsync<List<HotelResponse>>();
         Assert.NotNull(data);
         Assert.Single(data!);
-        Assert.All(data!, h => Assert.Equal("Berlin", h.City));
+        Assert.All(data!, h => Assert.Equal("Tübingen", h.City));
     }
 
     // ── Cities ──────────────────────────────────────────────────────
@@ -457,7 +475,7 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
     }
 
     [Fact]
-    public async Task GetHotels_User_IgnoresForeignCityParam()
+    public async Task GetHotels_User_ForeignCityParam_ReturnsEmpty()
     {
         // A Stuttgart user must never see Berlin hotels, even when asking for them
         var client = UserClient();
@@ -465,7 +483,7 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         response.EnsureSuccessStatusCode();
         var data = await response.Content.ReadFromJsonAsync<List<HotelResponse>>();
         Assert.NotNull(data);
-        Assert.All(data!, h => Assert.Equal("Stuttgart", h.City));
+        Assert.Empty(data!);
     }
 
     [Fact]
@@ -495,7 +513,55 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         var response = await client.GetAsync("/api/hotels");
         response.EnsureSuccessStatusCode();
         var data = await response.Content.ReadFromJsonAsync<List<HotelResponse>>();
-        Assert.Equal(3, data!.Count);
+        Assert.Equal(4, data!.Count);
+    }
+
+    [Fact]
+    public async Task Admin_SeesAllCities()
+    {
+        var client = AdminClient();
+        var response = await client.GetAsync("/api/cities");
+        response.EnsureSuccessStatusCode();
+        var data = await response.Content.ReadFromJsonAsync<List<CityResponse>>();
+        Assert.NotNull(data);
+        Assert.Equal(2, data!.Count);
+        Assert.Contains(data, c => c.Name == "Stuttgart");
+        Assert.Contains(data, c => c.Name == "Tübingen");
+    }
+
+    // ── Multi-city tenants ──────────────────────────────────────────
+
+    [Fact]
+    public async Task TenantWithTwoCities_SeesBothCities()
+    {
+        var client = MultiCityClient();
+        var response = await client.GetAsync("/api/hotels");
+        response.EnsureSuccessStatusCode();
+        var data = await response.Content.ReadFromJsonAsync<List<HotelResponse>>();
+        Assert.NotNull(data);
+        Assert.Equal(3, data!.Count); // 2 Stuttgart + 1 Tübingen
+        Assert.Contains(data, h => h.City == "Stuttgart");
+        Assert.Contains(data, h => h.City == "Tübingen");
+        Assert.DoesNotContain(data, h => h.City == "Berlin");
+
+        // Prices are scoped to both cities as well
+        var pricesResponse = await client.GetAsync("/api/prices");
+        var prices = await pricesResponse.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
+        Assert.NotNull(prices);
+        Assert.Equal(3, prices!.Count); // both Stuttgart hotels + Tübingen hotel
+    }
+
+    [Fact]
+    public async Task TenantWithOneCity_SeesOnlyThatCity()
+    {
+        var client = UserClient(); // tenant 1 → only Stuttgart
+        var response = await client.GetAsync("/api/hotels");
+        response.EnsureSuccessStatusCode();
+        var data = await response.Content.ReadFromJsonAsync<List<HotelResponse>>();
+        Assert.NotNull(data);
+        Assert.Equal(2, data!.Count);
+        Assert.All(data, h => Assert.Equal("Stuttgart", h.City));
+        Assert.DoesNotContain(data, h => h.City == "Tübingen");
     }
 
     // ── Patch Hotel (admin-only) ────────────────────────────────────
@@ -696,12 +762,12 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
     // ── IDOR-Schutz ─────────────────────────────────────────────────
 
     [Fact]
-    public async Task GetPrices_HotelIdsFromForeignCity_ReturnsEmpty()
+    public async Task Prices_HotelIdsFromForeignCity_ReturnsEmpty()
     {
-        var client = UserClient();
+        // Multi-city user (Stuttgart + Tübingen) asking for a Berlin hotel_id gets nothing
+        var client = MultiCityClient();
         var berlinHotel = await _db.Hotels.FirstAsync(h => h.BookingId == "2001");
 
-        // A Stuttgart user asking for a Berlin hotel_id must get nothing back
         var response = await client.GetAsync($"/api/prices?hotel_ids={berlinHotel.Id}");
         response.EnsureSuccessStatusCode();
         var data = await response.Content.ReadFromJsonAsync<List<HotelPricesResponse>>();
@@ -807,14 +873,17 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         var list = await client.GetAsync("/api/admin/tenants");
         list.EnsureSuccessStatusCode();
         var tenants = await list.Content.ReadFromJsonAsync<List<TenantResponse>>();
-        Assert.Single(tenants!);
-        Assert.Equal("Stuttgart Hotels GmbH", tenants![0].Name);
+        Assert.Equal(2, tenants!.Count);
+        Assert.Contains(tenants, t => t.Name == "Stuttgart Hotels GmbH");
+        Assert.Contains(tenants, t => t.Name == "Stuttgart-Tübingen Gruppe");
+        Assert.Contains(tenants.First(t => t.Name == "Stuttgart Hotels GmbH").Cities, c => c == "Stuttgart");
+        Assert.Contains(tenants.First(t => t.Name == "Stuttgart-Tübingen Gruppe").Cities, c => c == "Tübingen");
 
         var create = await client.PostAsJsonAsync("/api/admin/tenants",
-            new { name = "Tübingen Hotels GmbH", city = "Tübingen" });
+            new { name = "Tübingen Hotels GmbH", cities = new[] { "Tübingen" } });
         create.EnsureSuccessStatusCode();
         var created = await create.Content.ReadFromJsonAsync<TenantResponse>();
-        Assert.Equal("Tübingen", created!.City);
+        Assert.Contains("Tübingen", created!.Cities);
     }
 
     [Fact]
@@ -869,16 +938,16 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         response.EnsureSuccessStatusCode();
         var data = await response.Content.ReadFromJsonAsync<StatusResponse>();
         Assert.NotNull(data);
-        Assert.Equal(3, data!.TotalHotels);
-        Assert.Equal(2, data.ActiveHotels);
-        Assert.Equal(60, data.TotalPrices);
+        Assert.Equal(4, data!.TotalHotels);
+        Assert.Equal(3, data.ActiveHotels);
+        Assert.Equal(90, data.TotalPrices);
     }
 
     [Fact]
-    public async Task GetStatus_User_IsScopedToOwnCity()
+    public async Task GetStatus_User_IsScopedToOwnCities()
     {
         var client = UserClient();
-        var response = await client.GetAsync("/api/status");
+        var response = await client.GetAsync("/api/status?city=Stuttgart");
         var data = await response.Content.ReadFromJsonAsync<StatusResponse>();
         Assert.NotNull(data);
         Assert.Equal("Stuttgart", data!.City);
@@ -895,7 +964,7 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         [property: JsonPropertyName("role")] string Role,
         [property: JsonPropertyName("tenant_id")] int? TenantId,
         [property: JsonPropertyName("tenant_name")] string? TenantName,
-        [property: JsonPropertyName("city")] string? City);
+        [property: JsonPropertyName("cities")] List<string> Cities);
     private record CityResponse(
         [property: JsonPropertyName("name")] string Name,
         [property: JsonPropertyName("dest_label")] string? DestLabel
@@ -932,7 +1001,7 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
     private record TenantResponse(
         [property: JsonPropertyName("id")] int Id,
         [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("city")] string City,
+        [property: JsonPropertyName("cities")] List<string> Cities,
         [property: JsonPropertyName("is_active")] bool IsActive,
         [property: JsonPropertyName("created_at")] DateTime CreatedAt
     );

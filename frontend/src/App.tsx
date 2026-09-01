@@ -157,7 +157,9 @@ export default function App() {
         const ids = await getWatchlist();
         if (cancelled) return;
         const map = new Map<string, Set<number>>();
-        if (user.city) map.set(user.city, new Set(ids));
+        // The watchlist is tenant-wide; key the favorites per city so the UI
+        // can look them up per selected city.
+        (user.cities ?? []).forEach((c) => map.set(c, new Set(ids)));
         setFavorites(map);
       } catch (e) {
         console.error("Failed to load watchlist:", e);
@@ -286,8 +288,8 @@ export default function App() {
 
   const handleToggleFavorite = useCallback(
     async (id: number) => {
-      if (!user?.city) return;
-      const city = user.city;
+      if (!user?.cities?.length || !selectedCity) return;
+      const city = selectedCity;
       const wasFavorite = favorites.get(city)?.has(id) ?? false;
 
       // Optimistic update
@@ -390,7 +392,7 @@ export default function App() {
           <div className="text-right">
             <div className="text-sm font-medium text-gray-700">{user.email}</div>
             <div className="text-xs text-gray-400">
-              {user.role === "admin" ? "Administrator" : user.tenant_name ?? user.city ?? "Benutzer"}
+              {user.role === "admin" ? "Administrator" : user.tenant_name ?? user.cities?.join(", ") ?? "Benutzer"}
             </div>
           </div>
           <button

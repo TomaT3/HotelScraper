@@ -75,7 +75,7 @@ public record AuthUserOut(
     [property: JsonPropertyName("role")] string Role,
     [property: JsonPropertyName("tenant_id")] int? TenantId,
     [property: JsonPropertyName("tenant_name")] string? TenantName,
-    [property: JsonPropertyName("city")] string? City
+    [property: JsonPropertyName("cities")] List<string> Cities
 );
 
 public record WatchlistAddOut(
@@ -90,14 +90,14 @@ public record WatchlistRemoveOut(
 
 public record TenantIn(
     [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("city")] string City,
+    [property: JsonPropertyName("cities")] List<string>? Cities,
     [property: JsonPropertyName("is_active")] bool? IsActive
 );
 
 public record TenantOut(
     [property: JsonPropertyName("id")] int Id,
     [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("city")] string City,
+    [property: JsonPropertyName("cities")] List<string> Cities,
     [property: JsonPropertyName("is_active")] bool IsActive,
     [property: JsonPropertyName("created_at")] DateTime CreatedAt
 );

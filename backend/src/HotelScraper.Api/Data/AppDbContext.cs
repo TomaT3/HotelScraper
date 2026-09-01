@@ -10,6 +10,7 @@ public class AppDbContext : DbContext
     public DbSet<Price> Prices => Set<Price>();
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<TenantCity> TenantCities => Set<TenantCity>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
 
@@ -27,6 +28,17 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => new { e.HotelId, e.Date, e.RoomType })
                   .IsUnique()
                   .HasDatabaseName("uq_hotel_date_room");
+        });
+
+        modelBuilder.Entity<TenantCity>(entity =>
+        {
+            // Composite PK (TenantId, City) — a tenant can be assigned 1..N cities.
+            entity.HasKey(e => new { e.TenantId, e.City });
+
+            entity.HasOne<Tenant>()
+                  .WithMany()
+                  .HasForeignKey(e => e.TenantId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AppUser>(entity =>

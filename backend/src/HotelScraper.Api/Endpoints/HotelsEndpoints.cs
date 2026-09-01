@@ -32,9 +32,7 @@ public static class HotelsEndpoints
         {
             var ctx = currentTenant.Current;
 
-            IEnumerable<string> cities = options.CityList;
-            if (!ctx.IsAdmin)
-                cities = ctx.City is not null ? new[] { ctx.City } : [];
+            IEnumerable<string> cities = ctx.IsAdmin ? options.CityList : ctx.Cities;
 
             var result = new List<CityOut>();
             foreach (var city in cities)
@@ -52,12 +50,23 @@ public static class HotelsEndpoints
         {
             var ctx = currentTenant.Current;
 
-            // Users always see only their own city; admins may choose via ?city= (all if omitted)
-            var effectiveCity = ctx.IsAdmin ? city : ctx.City;
-
+            // Users always see only their own cities; admins may choose via ?city= (all if omitted)
             var query = db.Hotels.AsQueryable();
-            if (!string.IsNullOrWhiteSpace(effectiveCity))
-                query = query.Where(h => h.City == effectiveCity);
+            if (ctx.IsAdmin)
+            {
+                if (!string.IsNullOrWhiteSpace(city))
+                    query = query.Where(h => h.City == city);
+            }
+            else
+            {
+                query = query.Where(h => ctx.Cities.Contains(h.City));
+                // Optional ?city= only applies when it is part of the user's cities,
+                // otherwise the result is empty (foreign city must not leak data).
+                if (!string.IsNullOrWhiteSpace(city) && !ctx.Cities.Contains(city))
+                    return Results.Ok(new List<HotelOut>());
+                if (!string.IsNullOrWhiteSpace(city))
+                    query = query.Where(h => h.City == city);
+            }
 
             var hotels = await query
                 .OrderBy(h => h.Name)

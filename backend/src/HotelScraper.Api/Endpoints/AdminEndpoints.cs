@@ -1,6 +1,8 @@
+using HotelScraper.Api.Configuration;
 using HotelScraper.Api.Data;
 using HotelScraper.Api.Dtos;
 using HotelScraper.Api.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace HotelScraper.Api.Endpoints;
@@ -18,29 +20,53 @@ public static class AdminEndpoints
         {
             var tenants = await db.Tenants
                 .OrderBy(t => t.Name)
-                .Select(t => new TenantOut(t.Id, t.Name, t.City, t.IsActive, t.CreatedAt))
                 .ToListAsync();
-            return Results.Ok(tenants);
+
+            var cityGroups = await db.TenantCities
+                .GroupBy(tc => tc.TenantId)
+                .ToDictionaryAsync(g => g.Key, g => g.Select(tc => tc.City).OrderBy(c => c).ToList());
+
+            var result = tenants.Select(t => new TenantOut(
+                t.Id, t.Name,
+                cityGroups.TryGetValue(t.Id, out var cities) ? cities : new List<string>(),
+                t.IsActive, t.CreatedAt)).ToList();
+
+            return Results.Ok(result);
         });
 
-        group.MapPost("/tenants", async (TenantIn body, AppDbContext db) =>
+        group.MapPost("/tenants", async (TenantIn body, AppDbContext db, [FromServices] ScraperOptions options) =>
         {
-            if (string.IsNullOrWhiteSpace(body.Name) || string.IsNullOrWhiteSpace(body.City))
-                return Results.BadRequest(new { detail = "name and city are required" });
+            if (string.IsNullOrWhiteSpace(body.Name) || body.Cities is null || body.Cities.Count == 0)
+                return Results.BadRequest(new { detail = "name and at least one city are required" });
+
+            var cities = body.Cities
+                .Select(c => c.Trim())
+                .Where(c => c.Length > 0)
+                .Distinct()
+                .ToList();
+
+            if (cities.Count == 0)
+                return Results.BadRequest(new { detail = "name and at least one city are required" });
+
+            var unknown = cities.Where(c => !options.CityList.Contains(c)).ToList();
+            if (unknown.Count > 0)
+                return Results.BadRequest(new { detail = $"unknown city: {string.Join(", ", unknown)}" });
 
             var tenant = new Tenant
             {
                 Name = body.Name.Trim(),
-                City = body.City.Trim(),
                 IsActive = body.IsActive ?? true,
             };
             db.Tenants.Add(tenant);
             await db.SaveChangesAsync();
 
-            return Results.Ok(new TenantOut(tenant.Id, tenant.Name, tenant.City, tenant.IsActive, tenant.CreatedAt));
+            db.TenantCities.AddRange(cities.Select(c => new TenantCity { TenantId = tenant.Id, City = c }));
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new TenantOut(tenant.Id, tenant.Name, cities, tenant.IsActive, tenant.CreatedAt));
         });
 
-        group.MapPatch("/tenants/{id:int}", async (int id, TenantIn body, AppDbContext db) =>
+        group.MapPatch("/tenants/{id:int}", async (int id, TenantIn body, AppDbContext db, [FromServices] ScraperOptions options) =>
         {
             var tenant = await db.Tenants.FindAsync(id);
             if (tenant is null)
@@ -48,13 +74,39 @@ public static class AdminEndpoints
 
             if (!string.IsNullOrWhiteSpace(body.Name))
                 tenant.Name = body.Name.Trim();
-            if (!string.IsNullOrWhiteSpace(body.City))
-                tenant.City = body.City.Trim();
             if (body.IsActive.HasValue)
                 tenant.IsActive = body.IsActive.Value;
 
+            // Cities are replaced as a whole when provided
+            if (body.Cities is not null)
+            {
+                var cities = body.Cities
+                    .Select(c => c.Trim())
+                    .Where(c => c.Length > 0)
+                    .Distinct()
+                    .ToList();
+
+                if (cities.Count == 0)
+                    return Results.BadRequest(new { detail = "at least one city is required" });
+
+                var unknown = cities.Where(c => !options.CityList.Contains(c)).ToList();
+                if (unknown.Count > 0)
+                    return Results.BadRequest(new { detail = $"unknown city: {string.Join(", ", unknown)}" });
+
+                var existing = await db.TenantCities.Where(tc => tc.TenantId == tenant.Id).ToListAsync();
+                db.TenantCities.RemoveRange(existing);
+                db.TenantCities.AddRange(cities.Select(c => new TenantCity { TenantId = tenant.Id, City = c }));
+            }
+
             await db.SaveChangesAsync();
-            return Results.Ok(new TenantOut(tenant.Id, tenant.Name, tenant.City, tenant.IsActive, tenant.CreatedAt));
+
+            var tenantCities = await db.TenantCities
+                .Where(tc => tc.TenantId == tenant.Id)
+                .Select(tc => tc.City)
+                .OrderBy(c => c)
+                .ToListAsync();
+
+            return Results.Ok(new TenantOut(tenant.Id, tenant.Name, tenantCities, tenant.IsActive, tenant.CreatedAt));
         });
 
         // ── Users ────────────────────────────────────────────────────────

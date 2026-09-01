@@ -42,7 +42,7 @@ public static class AuthEndpoints
                 user.Role,
                 user.TenantId,
                 tenantName,
-                claims.FirstOrDefault(c => c.Type == "city")?.Value
+                claims.Where(c => c.Type == "city").Select(c => c.Value).ToList()
             ));
         });
 
@@ -72,8 +72,8 @@ public static class AuthEndpoints
                 user.TenantId,
                 tenantName,
                 user.TenantId.HasValue
-                    ? await db.Tenants.Where(t => t.Id == user.TenantId.Value).Select(t => t.City).FirstOrDefaultAsync(ct)
-                    : null
+                    ? await db.TenantCities.Where(tc => tc.TenantId == user.TenantId.Value).Select(tc => tc.City).ToListAsync(ct)
+                    : new List<string>()
             ));
         }).RequireAuthorization();
 

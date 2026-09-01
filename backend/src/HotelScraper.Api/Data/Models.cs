@@ -105,16 +105,24 @@ public class Tenant
     [Column("name")]
     public string Name { get; set; } = "";
 
-    [Required]
-    [MaxLength(100)]
-    [Column("city")]
-    public string City { get; set; } = "";
-
     [Column("is_active")]
     public bool IsActive { get; set; } = true;
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+// One tenant (hotel group) may see 1..N cities — each row is one city assignment.
+[Table("tenant_cities")]
+public class TenantCity
+{
+    [Column("tenant_id")]
+    public int TenantId { get; set; }
+
+    [Required]
+    [MaxLength(100)]
+    [Column("city")]
+    public string City { get; set; } = "";
 }
 
 [Index(nameof(Email), IsUnique = true)]

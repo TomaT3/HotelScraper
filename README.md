@@ -15,7 +15,7 @@ Zentrale SaaS-Instanz: Web-App, die täglich Hotelpreise über die Booking.com A
 - **Leichtgewicht** — Single Docker Container, SQLite, kein Redis/Celery nötig
 - **Synology-ready** — Docker Compose für NAS-Deployment optimiert
 
-> **Multi-Tenancy-Konzept:** Die Konkurrenz-Daten sind **pro Stadt geteilt** (nicht pro Kunde isoliert) — das teure RapidAPI-Scraping läuft nur einmal pro Stadt. Ein Mandant = ein Hotel = eine Stadt.
+> **Multi-Tenancy-Konzept:** Die Konkurrenz-Daten sind **pro Stadt geteilt** (nicht pro Kunde isoliert) — das teure RapidAPI-Scraping läuft nur einmal pro Stadt. Ein Mandant = eine Hotelgruppe mit **1..N Städten** (z.B. ein Hotel in Stuttgart und eines in Tübingen); der Kunde sieht die Preise aller seiner Städte.
 
 ## Voraussetzungen
 
@@ -56,13 +56,21 @@ Beim **ersten Start** wird aus `ADMIN_EMAIL` / `ADMIN_PASSWORD` ein Admin-Konto 
 ### 4. Mandanten & Benutzer anlegen (Admin)
 
 1. Mit dem Admin-Konto einloggen.
-2. Über die Admin-API einen Mandanten anlegen (Name + Stadt):
+2. Über die Admin-API einen Mandanten anlegen (Name + eine oder mehrere Städte):
    ```bash
    curl -X POST http://localhost:8080/api/admin/tenants \
      -H "Content-Type: application/json" \
      -H "Cookie: <Session-Cookie>" \
-     -d '{"name": "Hotel Beispiel GmbH", "city": "Stuttgart"}'
+     -d '{"name": "Hotel Beispiel GmbH", "cities": ["Stuttgart"]}'
    ```
+   Ein Mandant mit mehreren Städten (z.B. Stuttgart **und** Tübingen):
+   ```bash
+   curl -X POST http://localhost:8080/api/admin/tenants \
+     -H "Content-Type: application/json" \
+     -H "Cookie: <Session-Cookie>" \
+     -d '{"name": "Hotel Gruppe GmbH", "cities": ["Stuttgart", "Tübingen"]}'
+   ```
+   Alle Städte müssen in `Scraper:SearchCities` (kommagetrennt) enthalten sein.
 3. Benutzer für den Mandanten anlegen:
    ```bash
    curl -X POST http://localhost:8080/api/admin/users \
@@ -70,8 +78,8 @@ Beim **ersten Start** wird aus `ADMIN_EMAIL` / `ADMIN_PASSWORD` ein Admin-Konto 
      -H "Cookie: <Session-Cookie>" \
      -d '{"email": "rezeption@beispiel.de", "password": "<Initialpasswort>", "tenant_id": 1, "role": "user"}'
    ```
-   Alternativ lassen sich Mandanten/Benutzer direkt in der SQLite-DB pflegen (Tabellen `tenants`, `users`).
-4. Der Benutzer loggt sich ein und sieht ausschließlich die Preise seiner Stadt. Die Favoriten (Watchlist) sind an sein Konto gebunden.
+   Alternativ lassen sich Mandanten/Benutzer direkt in der SQLite-DB pflegen (Tabellen `tenants`, `tenant_cities`, `users`).
+4. Der Benutzer loggt sich ein und sieht ausschließlich die Preise seiner Städte. Die Favoriten (Watchlist) sind an sein Konto gebunden.
 
 ### 5. Ersten Abruf starten
 

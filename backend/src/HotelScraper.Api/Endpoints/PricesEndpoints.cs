@@ -26,14 +26,14 @@ public static class PricesEndpoints
             var roomType = room_type ?? "double";
             var ctx = currentTenant.Current;
 
-            // IDOR-Schutz: Hotels IMMER zuerst auf die Tenant-Stadt filtern,
+            // IDOR-Schutz: Hotels IMMER zuerst auf die Tenant-Städte filtern,
             // bevor hotel_ids angewendet wird.
             var hotelQuery = db.Hotels.AsQueryable();
             if (!ctx.IsAdmin)
             {
-                if (string.IsNullOrWhiteSpace(ctx.City))
+                if (ctx.Cities.Count == 0)
                     return Results.Ok(new List<HotelPrices>());
-                hotelQuery = hotelQuery.Where(h => h.City == ctx.City);
+                hotelQuery = hotelQuery.Where(h => ctx.Cities.Contains(h.City));
             }
 
             if (!string.IsNullOrWhiteSpace(hotel_ids))
@@ -81,46 +81,35 @@ public static class PricesEndpoints
             var scheduler = schedulerFactory is not null ? await schedulerFactory.GetScheduler() : null;
             var ctx = currentTenant.Current;
 
-            // Users are always scoped to their own city; admins may use ?city= (all if omitted)
+            // Users are always scoped to their own cities; admins may use ?city= (all if omitted)
             string? effectiveCity;
             if (ctx.IsAdmin)
                 effectiveCity = city;
             else
-                effectiveCity = ctx.City;
+                effectiveCity = !string.IsNullOrWhiteSpace(city) && ctx.Cities.Contains(city) ? city : null;
 
             var hotelQuery = db.Hotels.AsQueryable();
+            if (!ctx.IsAdmin)
+                hotelQuery = hotelQuery.Where(h => ctx.Cities.Contains(h.City));
             if (!string.IsNullOrWhiteSpace(effectiveCity))
                 hotelQuery = hotelQuery.Where(h => h.City == effectiveCity);
 
             var totalHotels = await hotelQuery.CountAsync();
             var activeHotels = await hotelQuery.CountAsync(h => h.Active);
 
-            int totalPrices;
-            int datesCovered;
+            // Price counts always scoped to the same hotel set (IDOR-safe for multi-city users)
+            var scopedHotelIds = hotelQuery.Select(h => h.Id);
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-            if (!string.IsNullOrWhiteSpace(effectiveCity))
-            {
-                var cityHotelIds = db.Hotels.Where(h => h.City == effectiveCity).Select(h => h.Id);
-                totalPrices = await db.Prices
-                    .Where(p => cityHotelIds.Contains(p.HotelId))
-                    .CountAsync();
-                datesCovered = await db.Prices
-                    .Where(p => p.Date >= today)
-                    .Where(p => cityHotelIds.Contains(p.HotelId))
-                    .Select(p => p.Date)
-                    .Distinct()
-                    .CountAsync();
-            }
-            else
-            {
-                totalPrices = await db.Prices.CountAsync();
-                datesCovered = await db.Prices
-                    .Where(p => p.Date >= today)
-                    .Select(p => p.Date)
-                    .Distinct()
-                    .CountAsync();
-            }
+            var totalPrices = await db.Prices
+                .Where(p => scopedHotelIds.Contains(p.HotelId))
+                .CountAsync();
+            var datesCovered = await db.Prices
+                .Where(p => p.Date >= today)
+                .Where(p => scopedHotelIds.Contains(p.HotelId))
+                .Select(p => p.Date)
+                .Distinct()
+                .CountAsync();
 
             var datesTotal = options.DatesPerRun;
             var coveragePct = datesTotal > 0

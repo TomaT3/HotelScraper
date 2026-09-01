@@ -200,12 +200,6 @@ namespace HotelScraper.Api.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
-                    b.Property<string>("City")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("city");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT")
                         .HasColumnName("created_at");
@@ -223,6 +217,22 @@ namespace HotelScraper.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("tenants");
+                });
+
+            modelBuilder.Entity("HotelScraper.Api.Data.TenantCity", b =>
+                {
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("city");
+
+                    b.HasKey("TenantId", "City");
+
+                    b.ToTable("tenant_cities");
                 });
 
             modelBuilder.Entity("HotelScraper.Api.Data.WatchlistItem", b =>
@@ -260,6 +270,15 @@ namespace HotelScraper.Api.Migrations
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("HotelScraper.Api.Data.TenantCity", b =>
+                {
+                    b.HasOne("HotelScraper.Api.Data.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("HotelScraper.Api.Data.WatchlistItem", b =>

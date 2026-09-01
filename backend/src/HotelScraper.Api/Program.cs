@@ -92,15 +92,23 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                     return;
                 }
 
-                // Refresh the city claim so tenant city changes take effect immediately.
+                // Refresh the city claims so tenant city changes take effect immediately.
+                // Multi-city: remove ALL existing city claims and re-add one per current city.
                 if (ctx.Principal?.Identity is ClaimsIdentity identity)
                 {
-                    var oldCityClaim = identity.FindFirst("city");
-                    if (oldCityClaim is null || oldCityClaim.Value != tenant.City)
+                    var currentCities = await db.TenantCities
+                        .Where(tc => tc.TenantId == user.TenantId.Value)
+                        .Select(tc => tc.City)
+                        .ToListAsync();
+
+                    var existingCities = identity.FindAll("city").Select(c => c.Value).ToList();
+
+                    if (!existingCities.OrderBy(c => c).SequenceEqual(currentCities.OrderBy(c => c)))
                     {
-                        if (oldCityClaim is not null)
-                            identity.RemoveClaim(oldCityClaim);
-                        identity.AddClaim(new Claim("city", tenant.City));
+                        foreach (var oldClaim in identity.FindAll("city").ToList())
+                            identity.RemoveClaim(oldClaim);
+                        foreach (var city in currentCities)
+                            identity.AddClaim(new Claim("city", city));
                         ctx.ReplacePrincipal(ctx.Principal!);
                         ctx.ShouldRenew = true;
                     }
