@@ -12,6 +12,8 @@ services:
       - Scraper__DatesPerRun=${DATES_PER_RUN:-3}
       - Scraper__FetchHour=${FETCH_HOUR:-3}
       - Scraper__SearchCities=Stuttgart,Tübingen
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     restart: unless-stopped
     logging:
       driver: json-file
