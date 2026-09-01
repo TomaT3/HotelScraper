@@ -4,6 +4,7 @@ using HotelScraper.Api.Dtos;
 using HotelScraper.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace HotelScraper.Api.Endpoints;
 
@@ -176,6 +177,51 @@ public static class AdminEndpoints
             user.PasswordHash = auth.HashPassword(body.Password);
             await db.SaveChangesAsync();
             return Results.Ok(new { ok = true, id = user.Id });
+        });
+
+        group.MapPatch("/users/{id:int}", async (int id, UserPatchIn body, AppDbContext db, ClaimsPrincipal principal) =>
+        {
+            var user = await db.Users.FindAsync(id);
+            if (user is null)
+                return Results.NotFound(new { detail = "User not found" });
+
+            // Self-protection: an admin must never lock themselves out.
+            var selfId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            var isSelf = int.TryParse(selfId, out var selfIdValue) && selfIdValue == user.Id;
+
+            if (!string.IsNullOrWhiteSpace(body.Role))
+            {
+                var role = body.Role.Trim().ToLowerInvariant();
+                if (role is not ("admin" or "user"))
+                    return Results.BadRequest(new { detail = "role must be 'admin' or 'user'" });
+
+                if (role == "user" && !body.TenantId.HasValue)
+                    return Results.BadRequest(new { detail = "tenant_id is required for role 'user'" });
+
+                user.Role = role;
+            }
+
+            if (body.TenantId.HasValue)
+            {
+                var tenantExists = await db.Tenants.AnyAsync(t => t.Id == body.TenantId.Value && t.IsActive);
+                if (!tenantExists)
+                    return Results.BadRequest(new { detail = "tenant not found or inactive" });
+                user.TenantId = body.TenantId;
+            }
+
+            if (body.IsActive.HasValue)
+            {
+                if (!body.IsActive.Value && isSelf)
+                    return Results.BadRequest(new { detail = "you cannot deactivate your own account" });
+                user.IsActive = body.IsActive.Value;
+            }
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new UserOut(
+                user.Id, user.Email, user.TenantId,
+                user.TenantId.HasValue ? await db.Tenants.Where(t => t.Id == user.TenantId.Value).Select(t => t.Name).FirstOrDefaultAsync() : null,
+                user.Role, user.IsActive, user.CreatedAt));
         });
 
         return group;
