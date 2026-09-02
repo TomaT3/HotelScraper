@@ -58,9 +58,48 @@ export interface ConfigResponse {
 }
 
 export interface AuthUser {
+  id: number;
   email: string;
   role: string;
   tenant_id: number | null;
   tenant_name: string | null;
   cities: string[];
+}
+
+export interface Tenant {
+  id: number;
+  name: string;
+  cities: string[];
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface UserAdmin {
+  id: number;
+  email: string;
+  tenant_id: number | null;
+  tenant_name: string | null;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface TenantInput {
+  name: string;
+  cities: string[];
+  is_active?: boolean;
+}
+
+export interface UserInput {
+  email: string;
+  password: string;
+  tenant_id?: number | null;
+  role?: string;
+  is_active?: boolean;
+}
+
+export interface UserPatchInput {
+  is_active?: boolean;
+  role?: string;
+  tenant_id?: number | null;
 }

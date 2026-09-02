@@ -38,6 +38,7 @@ public static class AuthEndpoints
                 : null;
 
             return Results.Ok(new AuthUserOut(
+                user.Id,
                 user.Email,
                 user.Role,
                 user.TenantId,
@@ -67,6 +68,7 @@ public static class AuthEndpoints
                 tenantName = await db.Tenants.Where(t => t.Id == user.TenantId.Value).Select(t => t.Name).FirstOrDefaultAsync(ct);
 
             return Results.Ok(new AuthUserOut(
+                user.Id,
                 user.Email,
                 user.Role,
                 user.TenantId,

@@ -71,6 +71,7 @@ public record LoginRequest(
 );
 
 public record AuthUserOut(
+    [property: JsonPropertyName("id")] int Id,
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("role")] string Role,
     [property: JsonPropertyName("tenant_id")] int? TenantId,
@@ -122,4 +123,10 @@ public record UserOut(
 
 public record ResetPasswordIn(
     [property: JsonPropertyName("password")] string Password
+);
+
+public record UserPatchIn(
+    [property: JsonPropertyName("is_active")] bool? IsActive,
+    [property: JsonPropertyName("role")] string? Role,
+    [property: JsonPropertyName("tenant_id")] int? TenantId
 );

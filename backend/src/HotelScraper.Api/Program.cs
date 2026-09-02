@@ -82,6 +82,45 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                 return;
             }
 
+            // Refresh the role claim so role changes (e.g. a demoted admin) take
+            // effect immediately instead of lingering until cookie expiry — the
+            // same staleness class as the deactivation check above.
+            if (ctx.Principal?.Identity is ClaimsIdentity roleIdentity)
+            {
+                var roleClaims = roleIdentity.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+                if (roleClaims.Count != 1 || roleClaims[0] != user.Role)
+                {
+                    foreach (var oldClaim in roleIdentity.FindAll(ClaimTypes.Role).ToList())
+                        roleIdentity.RemoveClaim(oldClaim);
+                    roleIdentity.AddClaim(new Claim(ClaimTypes.Role, user.Role));
+                    ctx.ReplacePrincipal(ctx.Principal!);
+                    ctx.ShouldRenew = true;
+                }
+            }
+
+            // Refresh the tenant_id claim so tenant assignments take effect
+            // immediately — the same staleness class as the role refresh above.
+            // Covers three cases: a demoted admin now assigned a tenant gets the
+            // claim added (login as admin issued no tenant_id claim), a user moved
+            // from one tenant to another (T1→T2) gets the claim replaced, and a
+            // user whose tenant was removed gets the stale claim deleted. Mirrors
+            // BuildClaimsAsync, which only issues the claim for tenant users.
+            if (ctx.Principal?.Identity is ClaimsIdentity tenantIdentity)
+            {
+                var currentTenantId = tenantIdentity.FindFirst("tenant_id")?.Value;
+                var expectedTenantId = user.TenantId.HasValue ? user.TenantId.Value.ToString() : null;
+
+                if (currentTenantId != expectedTenantId)
+                {
+                    foreach (var oldClaim in tenantIdentity.FindAll("tenant_id").ToList())
+                        tenantIdentity.RemoveClaim(oldClaim);
+                    if (user.TenantId.HasValue)
+                        tenantIdentity.AddClaim(new Claim("tenant_id", user.TenantId.Value.ToString()));
+                    ctx.ReplacePrincipal(ctx.Principal!);
+                    ctx.ShouldRenew = true;
+                }
+            }
+
             if (user.TenantId.HasValue)
             {
                 var tenant = await db.Tenants.FindAsync(user.TenantId.Value);

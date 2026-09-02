@@ -4,6 +4,7 @@ import HotelFilter from "./components/HotelFilter";
 import DateRangePicker from "./components/DateRangePicker";
 import HotelChart from "./components/HotelChart";
 import CitySelector from "./components/CitySelector";
+import AdminView from "./components/AdminView";
 import { ChevronDown } from "./components/Icons";
 import { useAuth } from "./auth/AuthContext";
 import {
@@ -130,6 +131,7 @@ export default function App() {
   const [favorites, setFavorites] = useState<Map<string, Set<number>>>(new Map());
   const [version, setVersion] = useState<string | null>(null);
   const [roomType, setRoomType] = useState<"single" | "double">("double");
+  const [view, setView] = useState<"dashboard" | "admin">("dashboard");
 
   const isAdmin = user?.role === "admin";
 
@@ -354,6 +356,7 @@ export default function App() {
 
   const handleLogout = useCallback(async () => {
     await logout();
+    setView("dashboard");
     setCities([]);
     setSelectedCity("");
     setHotels([]);
@@ -395,6 +398,18 @@ export default function App() {
               {user.role === "admin" ? "Administrator" : user.tenant_name ?? user.cities?.join(", ") ?? "Benutzer"}
             </div>
           </div>
+          {isAdmin && (
+            <button
+              onClick={() => setView(view === "admin" ? "dashboard" : "admin")}
+              className={`px-3 py-1.5 text-sm border rounded-lg transition-colors ${
+                view === "admin"
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-gray-300 hover:bg-gray-100 text-gray-600"
+              }`}
+            >
+              {view === "admin" ? "Zur Übersicht" : "Verwaltung"}
+            </button>
+          )}
           <button
             onClick={handleLogout}
             className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
@@ -404,6 +419,10 @@ export default function App() {
         </div>
       </div>
 
+      {view === "admin" && isAdmin ? (
+        <AdminView currentUserId={user.id} />
+      ) : (
+        <>
       {/* Status bar */}
       <StatusBar
         status={status}
@@ -481,6 +500,9 @@ export default function App() {
           <HotelChart data={prices} selectedIds={selectedIds} roomType={roomType} onRoomTypeChange={setRoomType} />
         </div>
       </div>
+
+        </>
+      )}
 
       {/* Footer */}
       <div className="text-center text-xs text-gray-400 pt-4">
