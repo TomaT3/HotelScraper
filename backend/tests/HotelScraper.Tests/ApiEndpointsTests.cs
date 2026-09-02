@@ -981,6 +981,17 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task PatchUser_SelfDemotion_Returns400()
+    {
+        // AdminClient uses X-Test-UserId=1 — the seeded admin account.
+        // Self-demotion would lock the admin out of /api/admin, so the
+        // endpoint must reject it even when a valid tenant_id is supplied.
+        var client = AdminClient();
+        var response = await client.PatchAsJsonAsync("/api/admin/users/1", new { role = "user", tenant_id = 1 });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     // ── Status ──────────────────────────────────────────────────────
 
     [Fact]
