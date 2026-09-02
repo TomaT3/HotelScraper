@@ -82,6 +82,22 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                 return;
             }
 
+            // Refresh the role claim so role changes (e.g. a demoted admin) take
+            // effect immediately instead of lingering until cookie expiry — the
+            // same staleness class as the deactivation check above.
+            if (ctx.Principal?.Identity is ClaimsIdentity roleIdentity)
+            {
+                var roleClaims = roleIdentity.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+                if (roleClaims.Count != 1 || roleClaims[0] != user.Role)
+                {
+                    foreach (var oldClaim in roleIdentity.FindAll(ClaimTypes.Role).ToList())
+                        roleIdentity.RemoveClaim(oldClaim);
+                    roleIdentity.AddClaim(new Claim(ClaimTypes.Role, user.Role));
+                    ctx.ReplacePrincipal(ctx.Principal!);
+                    ctx.ShouldRenew = true;
+                }
+            }
+
             if (user.TenantId.HasValue)
             {
                 var tenant = await db.Tenants.FindAsync(user.TenantId.Value);

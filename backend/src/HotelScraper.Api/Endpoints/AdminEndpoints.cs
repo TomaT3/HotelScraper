@@ -198,6 +198,12 @@ public static class AdminEndpoints
                 if (role == "user" && !body.TenantId.HasValue)
                     return Results.BadRequest(new { detail = "tenant_id is required for role 'user'" });
 
+                // Self-protection: an admin must never demote themselves — if they
+                // are the last admin, nobody could restore the role (same lockout
+                // as self-deactivation).
+                if (isSelf && user.Role == "admin" && role == "user")
+                    return Results.BadRequest(new { detail = "you cannot demote your own account" });
+
                 user.Role = role;
             }
 
