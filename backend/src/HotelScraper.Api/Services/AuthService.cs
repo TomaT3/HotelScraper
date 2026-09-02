@@ -38,7 +38,7 @@ public class AuthService
 
         if (user.TenantId.HasValue)
         {
-            claims.Add(new Claim("tenant_id", user.TenantId.Value.ToString()));
+            claims.Add(new Claim(AuthClaimTypes.TenantId, user.TenantId.Value.ToString()));
 
             // Multi-city: one "city" claim per city the tenant is assigned to.
             var cities = await _db.TenantCities
@@ -47,7 +47,7 @@ public class AuthService
                 .ToListAsync(ct);
 
             foreach (var city in cities)
-                claims.Add(new Claim("city", city));
+                claims.Add(new Claim(AuthClaimTypes.City, city));
         }
 
         return claims;

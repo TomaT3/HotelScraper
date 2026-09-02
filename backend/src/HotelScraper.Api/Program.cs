@@ -107,15 +107,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             // BuildClaimsAsync, which only issues the claim for tenant users.
             if (ctx.Principal?.Identity is ClaimsIdentity tenantIdentity)
             {
-                var currentTenantId = tenantIdentity.FindFirst("tenant_id")?.Value;
+                var currentTenantId = tenantIdentity.FindFirst(AuthClaimTypes.TenantId)?.Value;
                 var expectedTenantId = user.TenantId.HasValue ? user.TenantId.Value.ToString() : null;
 
                 if (currentTenantId != expectedTenantId)
                 {
-                    foreach (var oldClaim in tenantIdentity.FindAll("tenant_id").ToList())
+                    foreach (var oldClaim in tenantIdentity.FindAll(AuthClaimTypes.TenantId).ToList())
                         tenantIdentity.RemoveClaim(oldClaim);
                     if (user.TenantId.HasValue)
-                        tenantIdentity.AddClaim(new Claim("tenant_id", user.TenantId.Value.ToString()));
+                        tenantIdentity.AddClaim(new Claim(AuthClaimTypes.TenantId, user.TenantId.Value.ToString()));
                     ctx.ReplacePrincipal(ctx.Principal!);
                     ctx.ShouldRenew = true;
                 }
@@ -140,14 +140,14 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                         .Select(tc => tc.City)
                         .ToListAsync();
 
-                    var existingCities = identity.FindAll("city").Select(c => c.Value).ToList();
+                    var existingCities = identity.FindAll(AuthClaimTypes.City).Select(c => c.Value).ToList();
 
                     if (!existingCities.OrderBy(c => c).SequenceEqual(currentCities.OrderBy(c => c)))
                     {
-                        foreach (var oldClaim in identity.FindAll("city").ToList())
+                        foreach (var oldClaim in identity.FindAll(AuthClaimTypes.City).ToList())
                             identity.RemoveClaim(oldClaim);
                         foreach (var city in currentCities)
-                            identity.AddClaim(new Claim("city", city));
+                            identity.AddClaim(new Claim(AuthClaimTypes.City, city));
                         ctx.ReplacePrincipal(ctx.Principal!);
                         ctx.ShouldRenew = true;
                     }
