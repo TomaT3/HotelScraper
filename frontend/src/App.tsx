@@ -57,16 +57,16 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow p-6 space-y-4">
+      <div className="w-full max-w-sm bg-surface-card border border-hairline rounded-none p-8 space-y-5">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">🏨 Hotel Price Tracker</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="font-display text-2xl tracking-display-sm text-ink">Hotel Price Tracker</h1>
+          <p className="text-sm text-muted mt-1">
             Bitte melden Sie sich mit Ihrem Konto an.
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="login-email" className="block font-mono text-xs uppercase tracking-label-sm text-muted">
               E-Mail
             </label>
             <input
@@ -76,12 +76,12 @@ function LoginForm() {
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-full py-2 bg-transparent border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:border-ink"
               placeholder="name@hotel.de"
             />
           </div>
           <div>
-            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="login-password" className="block font-mono text-xs uppercase tracking-label-sm text-muted">
               Passwort
             </label>
             <input
@@ -91,18 +91,18 @@ function LoginForm() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-full py-2 bg-transparent border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:border-ink"
             />
           </div>
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <div className="text-sm text-danger border border-hairline-strong rounded-none px-3 py-2">
               {error}
             </div>
           )}
           <button
             type="submit"
             disabled={submitting}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+            className="w-full py-3 border border-ink text-ink rounded-pill font-mono text-sm uppercase tracking-label hover:bg-ink hover:text-canvas transition-colors disabled:opacity-40"
           >
             {submitting ? "Anmelden..." : "Anmelden"}
           </button>
@@ -383,8 +383,8 @@ export default function App() {
     <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-3 sm:space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-lg sm:text-2xl font-bold text-gray-800">
-          🏨 {selectedCity || "Hotel"} Hotel Price Tracker
+        <h1 className="font-display uppercase tracking-display-sm text-ink text-xl sm:text-2xl">
+          {selectedCity || "Hotel"} · Hotel Price Tracker
         </h1>
         <CitySelector
           cities={cities}
@@ -393,18 +393,18 @@ export default function App() {
         />
         <div className="ml-auto flex items-center gap-3">
           <div className="text-right">
-            <div className="text-sm font-medium text-gray-700">{user.email}</div>
-            <div className="text-xs text-gray-400">
+            <div className="text-sm text-body-strong">{user.email}</div>
+            <div className="text-xs text-muted">
               {user.role === "admin" ? "Administrator" : user.tenant_name ?? user.cities?.join(", ") ?? "Benutzer"}
             </div>
           </div>
           {isAdmin && (
             <button
               onClick={() => setView(view === "admin" ? "dashboard" : "admin")}
-              className={`px-3 py-1.5 text-sm border rounded-lg transition-colors ${
+              className={`px-4 py-1.5 text-xs font-mono uppercase tracking-label-sm rounded-pill border transition-colors ${
                 view === "admin"
-                  ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-gray-300 hover:bg-gray-100 text-gray-600"
+                  ? "border-ink text-ink"
+                  : "border-hairline-strong text-muted hover:text-body"
               }`}
             >
               {view === "admin" ? "Zur Übersicht" : "Verwaltung"}
@@ -412,7 +412,7 @@ export default function App() {
           )}
           <button
             onClick={handleLogout}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+            className="px-4 py-1.5 text-xs font-mono uppercase tracking-label-sm rounded-pill border border-hairline-strong text-muted hover:text-body transition-colors"
           >
             Abmelden
           </button>
@@ -505,10 +505,10 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <div className="text-center text-xs text-gray-400 pt-4">
+      <div className="text-center text-xs text-muted-soft pt-4">
         Daten via Booking.com (RapidAPI) · Preise für {roomType === "single" ? "Einzelzimmer" : "Doppelzimmer"} / 1 Nacht
         {version && (
-          <span className="ml-2 font-mono text-gray-300">· {version}</span>
+          <span className="ml-2 font-mono text-muted">· {version}</span>
         )}
       </div>
     </div>
