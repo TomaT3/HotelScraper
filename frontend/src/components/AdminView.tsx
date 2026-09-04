@@ -244,8 +244,8 @@ export default function AdminView({ currentUserId }: Props) {
 
   const badge = (active: boolean, activeLabel: string, inactiveLabel: string) => (
     <span
-      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-        active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+      className={`px-2 py-0.5 rounded-none text-xs font-mono uppercase tracking-label-sm ${
+        active ? "text-success" : "text-muted"
       }`}
     >
       {active ? activeLabel : inactiveLabel}
@@ -259,10 +259,10 @@ export default function AdminView({ currentUserId }: Props) {
         setError(null);
         setSuccess(null);
       }}
-      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+      className={`px-4 py-2 rounded-pill text-xs font-mono uppercase tracking-label-sm transition-colors ${
         tab === id
-          ? "bg-blue-600 text-white shadow-sm"
-          : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+          ? "border border-ink text-ink"
+          : "border border-hairline-strong text-muted hover:text-body"
       }`}
     >
       {label}
@@ -270,13 +270,13 @@ export default function AdminView({ currentUserId }: Props) {
   );
 
   const inputClass =
-    "mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
-  const labelClass = "block text-sm font-medium text-gray-700";
+    "mt-1 w-full py-2 bg-canvas border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:border-ink";
+  const labelClass = "block font-mono text-xs uppercase tracking-label-sm text-muted";
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <h2 className="text-lg font-bold text-gray-800">Verwaltung</h2>
+        <h2 className="font-display uppercase tracking-display-md text-ink">Verwaltung</h2>
         <div className="flex gap-2">
           {tabButton("tenants", "Tenants")}
           {tabButton("users", "Benutzer")}
@@ -284,12 +284,12 @@ export default function AdminView({ currentUserId }: Props) {
       </div>
 
       {error && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        <div className="text-sm text-danger border border-hairline-strong rounded-none px-3 py-2">
           {error}
         </div>
       )}
       {success && (
-        <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+        <div className="text-sm text-success border border-hairline-strong rounded-none px-3 py-2">
           {success}
         </div>
       )}
@@ -298,9 +298,9 @@ export default function AdminView({ currentUserId }: Props) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Tenant list */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="bg-surface-card border border-hairline rounded-none overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <thead className="bg-surface-soft text-left text-xs uppercase tracking-wide text-muted">
                   <tr>
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Städte</th>
@@ -308,29 +308,29 @@ export default function AdminView({ currentUserId }: Props) {
                     <th className="px-4 py-3 text-right">Aktionen</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-hairline">
                   {loadingTenants ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
+                      <td colSpan={4} className="px-4 py-6 text-center text-muted">
                         Wird geladen…
                       </td>
                     </tr>
                   ) : tenants.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
+                      <td colSpan={4} className="px-4 py-6 text-center text-muted">
                         Keine Tenants vorhanden.
                       </td>
                     </tr>
                   ) : (
                     tenants.map((t) => (
-                      <tr key={t.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-800">{t.name}</td>
+                      <tr key={t.id} className="hover:bg-surface-elevated">
+                        <td className="px-4 py-3 text-body-strong">{t.name}</td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">
                             {t.cities.map((c) => (
                               <span
                                 key={c}
-                                className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs"
+                                className="px-2 py-0.5 rounded-none font-mono text-xs text-link"
                               >
                                 {c}
                               </span>
@@ -341,7 +341,7 @@ export default function AdminView({ currentUserId }: Props) {
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => startEditTenant(t)}
-                            className="px-2 py-1 text-xs border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+                            className="px-2 py-1 text-xs border border-hairline-strong rounded-pill font-mono uppercase tracking-label-sm text-muted hover:text-body transition-colors"
                           >
                             Bearbeiten
                           </button>
@@ -356,8 +356,8 @@ export default function AdminView({ currentUserId }: Props) {
 
           {/* Tenant form */}
           <div>
-            <form onSubmit={handleTenantSubmit} className="bg-white rounded-xl shadow p-5 space-y-4">
-              <h3 className="font-semibold text-gray-800">
+            <form onSubmit={handleTenantSubmit} className="bg-surface-card border border-hairline rounded-none p-5 space-y-4">
+              <h3 className="font-display uppercase tracking-display-md text-ink">
                 {editingTenantId !== null ? "Tenant bearbeiten" : "Neuer Tenant"}
               </h3>
               <div>
@@ -378,27 +378,27 @@ export default function AdminView({ currentUserId }: Props) {
                 <span className={labelClass}>Städte</span>
                 <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto">
                   {cities.length === 0 && (
-                    <div className="text-xs text-gray-400">Keine Städte konfiguriert.</div>
+                    <div className="text-xs text-muted">Keine Städte konfiguriert.</div>
                   )}
                   {cities.map((c) => (
-                    <label key={c.name} className="flex items-center gap-2 text-sm text-gray-700">
+                    <label key={c.name} className="flex items-center gap-2 text-sm text-body">
                       <input
                         type="checkbox"
                         checked={tenantForm.cities.includes(c.name)}
                         onChange={(e) => toggleCity(c.name, e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-hairline text-link"
                       />
                       {c.name}
                     </label>
                   ))}
                 </div>
               </div>
-              <label className="flex items-center gap-2 text-sm text-gray-700">
+              <label className="flex items-center gap-2 text-sm text-body">
                 <input
                   type="checkbox"
                   checked={tenantForm.is_active}
                   onChange={(e) => setTenantForm((f) => ({ ...f, is_active: e.target.checked }))}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-hairline text-link"
                 />
                 Aktiv
               </label>
@@ -406,7 +406,7 @@ export default function AdminView({ currentUserId }: Props) {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                  className="flex-1 px-4 py-2 border border-ink text-ink rounded-pill font-mono uppercase tracking-label text-sm hover:bg-ink hover:text-canvas transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {submitting
                     ? "Speichern…"
@@ -418,7 +418,7 @@ export default function AdminView({ currentUserId }: Props) {
                   <button
                     type="button"
                     onClick={cancelEditTenant}
-                    className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+                    className="px-4 py-2 text-sm border border-hairline-strong rounded-pill font-mono uppercase tracking-label text-muted hover:text-body transition-colors"
                   >
                     Abbrechen
                   </button>
@@ -431,9 +431,9 @@ export default function AdminView({ currentUserId }: Props) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* User list */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="bg-surface-card border border-hairline rounded-none overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <thead className="bg-surface-soft text-left text-xs uppercase tracking-wide text-muted">
                   <tr>
                     <th className="px-4 py-3">E-Mail</th>
                     <th className="px-4 py-3">Rolle</th>
@@ -442,16 +442,16 @@ export default function AdminView({ currentUserId }: Props) {
                     <th className="px-4 py-3 text-right">Aktionen</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-hairline">
                   {loadingUsers ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                      <td colSpan={5} className="px-4 py-6 text-center text-muted">
                         Wird geladen…
                       </td>
                     </tr>
                   ) : users.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                      <td colSpan={5} className="px-4 py-6 text-center text-muted">
                         Keine Benutzer vorhanden.
                       </td>
                     </tr>
@@ -459,27 +459,27 @@ export default function AdminView({ currentUserId }: Props) {
                     users.map((u) => {
                       const isSelf = u.id === currentUserId;
                       return (
-                        <tr key={u.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-800">
+                        <tr key={u.id} className="hover:bg-surface-elevated">
+                          <td className="px-4 py-3 text-body-strong">
                             {u.email}
                             {isSelf && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs">
+                              <span className="ml-2 px-2 py-0.5 rounded-none font-mono uppercase tracking-label-sm text-xs text-warning">
                                 eigenes Konto
                               </span>
                             )}
                           </td>
                           <td className="px-4 py-3">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              className={`px-2 py-0.5 rounded-none font-mono uppercase tracking-label-sm text-xs ${
                                 u.role === "admin"
-                                  ? "bg-indigo-100 text-indigo-700"
-                                  : "bg-gray-100 text-gray-600"
+                                  ? "text-link"
+                                  : "text-muted"
                               }`}
                             >
                               {u.role === "admin" ? "Admin" : "Benutzer"}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-gray-600">{u.tenant_name ?? "—"}</td>
+                          <td className="px-4 py-3 text-body">{u.tenant_name ?? "—"}</td>
                           <td className="px-4 py-3">{badge(u.is_active, "aktiv", "inaktiv")}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-2">
@@ -487,17 +487,17 @@ export default function AdminView({ currentUserId }: Props) {
                                 onClick={() => handleToggleUser(u)}
                                 disabled={isSelf && u.is_active}
                                 title={isSelf ? "Das eigene Konto kann nicht deaktiviert werden" : undefined}
-                                className={`px-2 py-1 text-xs border rounded-lg transition-colors ${
+                                className={`px-2 py-1 text-xs border rounded-pill font-mono uppercase tracking-label-sm transition-colors ${
                                   isSelf && u.is_active
-                                    ? "border-gray-200 text-gray-300 cursor-not-allowed"
-                                    : "border-gray-300 hover:bg-gray-100 text-gray-600"
+                                    ? "border-hairline text-muted-soft cursor-not-allowed"
+                                    : "border-hairline-strong text-muted hover:text-body"
                                 }`}
                               >
                                 {u.is_active ? "Deaktivieren" : "Aktivieren"}
                               </button>
                               <button
                                 onClick={() => handleResetPassword(u)}
-                                className="px-2 py-1 text-xs border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+                                className="px-2 py-1 text-xs border border-hairline-strong rounded-pill font-mono uppercase tracking-label-sm text-muted hover:text-body transition-colors"
                               >
                                 Passwort zurücksetzen
                               </button>
@@ -514,8 +514,8 @@ export default function AdminView({ currentUserId }: Props) {
 
           {/* User create form */}
           <div>
-            <form onSubmit={handleUserSubmit} className="bg-white rounded-xl shadow p-5 space-y-4">
-              <h3 className="font-semibold text-gray-800">Neuer Benutzer</h3>
+            <form onSubmit={handleUserSubmit} className="bg-surface-card border border-hairline rounded-none p-5 space-y-4">
+              <h3 className="font-display uppercase tracking-display-md text-ink">Neuer Benutzer</h3>
               <div>
                 <label htmlFor="user-email" className={labelClass}>
                   E-Mail
@@ -594,19 +594,19 @@ export default function AdminView({ currentUserId }: Props) {
                   </select>
                 </div>
               )}
-              <label className="flex items-center gap-2 text-sm text-gray-700">
+              <label className="flex items-center gap-2 text-sm text-body">
                 <input
                   type="checkbox"
                   checked={userForm.is_active}
                   onChange={(e) => setUserForm((f) => ({ ...f, is_active: e.target.checked }))}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-hairline text-link"
                 />
                 Aktiv
               </label>
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                className="w-full px-4 py-2 border border-ink text-ink rounded-pill font-mono uppercase tracking-label text-sm hover:bg-ink hover:text-canvas transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {submitting ? "Anlegen…" : "Benutzer anlegen"}
               </button>

@@ -35,20 +35,20 @@ export default function HotelFilter({
   });
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
+    <div className="bg-surface-card border border-hairline rounded-none p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-700">Hotels</h3>
+        <h3 className="font-display uppercase tracking-display-md text-ink">Hotels</h3>
         <div className="flex gap-2">
           <button
             onClick={onSelectAll}
-            className="text-xs text-blue-600 hover:underline"
+            className="text-xs text-link hover:underline"
           >
             Alle
           </button>
-          <span className="text-gray-300">|</span>
+          <span className="text-muted">|</span>
           <button
             onClick={onDeselectAll}
-            className="text-xs text-blue-600 hover:underline"
+            className="text-xs text-link hover:underline"
           >
             Keine
           </button>
@@ -61,10 +61,10 @@ export default function HotelFilter({
           <button
             key={s ?? "all"}
             onClick={() => onStarFilterChange(s)}
-            className={`px-2 py-1 text-xs rounded ${
+            className={`px-2 py-1 text-xs rounded-pill font-mono uppercase tracking-label-sm transition-colors ${
               starFilter === s
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                ? "border border-ink text-ink"
+                : "bg-surface-soft text-muted hover:bg-surface-elevated"
             }`}
           >
             {s === null ? "Alle" : `${s} ★`}
@@ -78,25 +78,25 @@ export default function HotelFilter({
         placeholder="Hotel suchen..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="w-full py-2 bg-transparent border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:border-ink mb-3"
       />
 
       {/* Hotel list */}
 
       <div className="max-h-80 overflow-y-auto space-y-1">
         {filteredHotels.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">Keine Hotels gefunden</p>
+          <p className="text-sm text-muted italic">Keine Hotels gefunden</p>
         ) : (
           filteredHotels.map((hotel) => (
             <label
               key={hotel.id}
-              className="flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-50 cursor-pointer text-sm"
+              className="flex items-center gap-2 py-1 px-2 rounded-none hover:bg-surface-elevated cursor-pointer text-sm"
             >
               <input
                 type="checkbox"
                 checked={selectedIds.has(hotel.id)}
                 onChange={() => onToggle(hotel.id)}
-                className="rounded text-blue-600"
+                className="rounded text-link"
               />
               {/* Favorite star */}
               <button
@@ -106,8 +106,8 @@ export default function HotelFilter({
                 }}
                 className={`text-base flex-shrink-0 transition-colors ${
                   favorites.has(hotel.id)
-                    ? "text-yellow-500 hover:text-yellow-600"
-                    : "text-gray-300 hover:text-gray-400"
+                    ? "text-warning hover:opacity-75"
+                    : "text-muted-soft hover:text-muted"
                 }`}
                 title={favorites.has(hotel.id) ? "Favorit entfernen" : "Als Favorit markieren"}
               >
@@ -115,12 +115,12 @@ export default function HotelFilter({
               </button>
               <span className="truncate flex-1">{hotel.name}</span>
               {hotel.stars != null && (
-                <span className="text-yellow-500 text-xs flex-shrink-0">
+                <span className="text-warning text-xs flex-shrink-0">
                   {hotel.stars > 0 ? "★".repeat(hotel.stars) : "—"}
                 </span>
               )}
               {hotel.review_score && (
-                <span className="text-gray-400 text-xs flex-shrink-0">
+                <span className="text-muted text-xs flex-shrink-0">
                   {hotel.review_score.toFixed(1)}
                 </span>
               )}
@@ -128,7 +128,7 @@ export default function HotelFilter({
           ))
         )}
       </div>
-      <div className="mt-2 text-xs text-gray-400">
+      <div className="mt-2 text-xs text-muted-soft">
         {selectedIds.size} von {filteredHotels.length} ausgewählt
         {favorites.size > 0 && (
           <span className="ml-2">· {favorites.size} Favoriten</span>
