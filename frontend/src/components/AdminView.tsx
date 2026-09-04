@@ -259,7 +259,8 @@ export default function AdminView({ currentUserId }: Props) {
         setError(null);
         setSuccess(null);
       }}
-      aria-pressed={tab === id}
+      role="radio"
+      aria-checked={tab === id}
       className={`px-4 py-2 rounded-pill text-xs font-mono uppercase tracking-label-sm transition-colors ${
         tab === id
           ? "border border-ink text-ink bg-surface-elevated"
@@ -278,7 +279,11 @@ export default function AdminView({ currentUserId }: Props) {
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <h2 className="font-display uppercase tracking-display-md text-ink">Verwaltung</h2>
-        <div className="flex gap-2">
+        <div
+          className="flex gap-2"
+          role="radiogroup"
+          aria-label="Verwaltungsbereich"
+        >
           {tabButton("tenants", "Tenants")}
           {tabButton("users", "Benutzer")}
         </div>

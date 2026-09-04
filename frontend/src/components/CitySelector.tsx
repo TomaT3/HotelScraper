@@ -14,12 +14,17 @@ export default function CitySelector({
   if (cities.length <= 1) return null;
 
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className="flex items-center gap-2"
+      role="radiogroup"
+      aria-label="Stadt auswählen"
+    >
       {cities.map((city) => (
         <button
           key={city.name}
           onClick={() => onCityChange(city.name)}
-          aria-pressed={selectedCity === city.name}
+          role="radio"
+          aria-checked={selectedCity === city.name}
           className={`px-4 py-1.5 text-sm font-mono uppercase tracking-label-sm rounded-pill border transition-colors ${
             selectedCity === city.name
               ? "border-ink text-ink"

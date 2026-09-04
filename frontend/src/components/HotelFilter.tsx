@@ -56,12 +56,17 @@ export default function HotelFilter({
       </div>
 
       {/* Star filter */}
-      <div className="flex gap-2 mb-3">
+      <div
+        className="flex gap-2 mb-3"
+        role="radiogroup"
+        aria-label="Sterne-Filter"
+      >
         {STAR_OPTIONS.map((s) => (
           <button
             key={s ?? "all"}
             onClick={() => onStarFilterChange(s)}
-            aria-pressed={starFilter === s}
+            role="radio"
+            aria-checked={starFilter === s}
             className={`px-2 py-1 text-xs rounded-pill font-mono uppercase tracking-label-sm transition-colors ${
               starFilter === s
                 ? "border border-ink text-ink bg-surface-elevated"

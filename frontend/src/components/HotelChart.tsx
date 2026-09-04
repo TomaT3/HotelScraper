@@ -214,10 +214,15 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
         <h3 className="font-display uppercase tracking-display-md text-ink text-sm sm:text-base">
           Preisverlauf — {roomType === "single" ? "Einzelzimmer" : "Doppelzimmer"} / Nacht
         </h3>
-        <div className="flex bg-surface-soft rounded-pill p-0.5 text-xs">
+        <div
+          className="flex bg-surface-soft rounded-pill p-0.5 text-xs"
+          role="radiogroup"
+          aria-label="Zimmertyp"
+        >
           <button
             onClick={() => onRoomTypeChange("double")}
-            aria-pressed={roomType === "double"}
+            role="radio"
+            aria-checked={roomType === "double"}
             className={`px-3 py-1 rounded-pill transition-colors ${
               roomType === "double"
                 ? "bg-surface-elevated text-ink"
@@ -228,7 +233,8 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
           </button>
           <button
             onClick={() => onRoomTypeChange("single")}
-            aria-pressed={roomType === "single"}
+            role="radio"
+            aria-checked={roomType === "single"}
             className={`px-3 py-1 rounded-pill transition-colors ${
               roomType === "single"
                 ? "bg-surface-elevated text-ink"
