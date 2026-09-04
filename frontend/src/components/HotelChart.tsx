@@ -21,10 +21,10 @@ interface Props {
 
 // Distinct colors for up to 20 hotels
 const COLORS = [
-  "#2563eb", "#dc2626", "#16a34a", "#ea580c", "#9333ea",
-  "#0891b2", "#ca8a04", "#e11d48", "#4f46e5", "#059669",
-  "#d97706", "#7c3aed", "#0284c7", "#be123c", "#65a30d",
-  "#c026d3", "#0d9488", "#b91c1c", "#1d4ed8", "#a16207",
+  "#60a5fa", "#f87171", "#4ade80", "#fb923c", "#c084fc",
+  "#22d3ee", "#facc15", "#f472b6", "#a5b4fc", "#34d399",
+  "#fbbf24", "#e879f9", "#38bdf8", "#fb7185", "#a3e635",
+  "#d946ef", "#2dd4bf", "#fca5a5", "#93c5fd", "#fcd34d",
 ];
 
 interface ChartDataPoint {
@@ -183,8 +183,8 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
       : payload.sort((a: any, b: any) => (a.value ?? 0) - (b.value ?? 0));
 
     return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm max-w-xs">
-        <p className="font-semibold mb-1">
+      <div className="bg-surface-card border border-hairline rounded-none p-3 text-sm max-w-xs">
+        <p className="font-display text-ink mb-1">
           {new Date(label + "T00:00:00").toLocaleDateString("de-DE", {
             weekday: "short",
             day: "2-digit",
@@ -193,7 +193,7 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
           })}
         </p>
         {items.length > 5 ? (
-          <p className="text-gray-400 text-xs italic">
+          <p className="text-muted text-xs italic">
             {items.length} Hotels · Klicke für Details
           </p>
         ) : (
@@ -202,7 +202,7 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
               <span style={{ color: entry.color }} className="truncate">
                 {entry.name}
               </span>
-              <span className="font-medium">{entry.value?.toFixed(0)} €</span>
+              <span className="text-body-strong">{entry.value?.toFixed(0)} €</span>
             </div>
           ))
         )}
@@ -216,18 +216,18 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
   const selectedDatePrices = selectedDate ? getPricesForDate(selectedDate) : [];
 
   return (
-    <div className="bg-white rounded-lg shadow p-2 sm:p-4">
+    <div className="bg-surface-card border border-hairline rounded-none p-2 sm:p-4">
       <div className="flex items-center justify-between mb-2 sm:mb-4 flex-wrap gap-2">
-        <h3 className="font-semibold text-gray-700 text-sm sm:text-base">
+        <h3 className="font-display uppercase tracking-display-md text-ink text-sm sm:text-base">
           Preisverlauf — {roomType === "single" ? "Einzelzimmer" : "Doppelzimmer"} / Nacht
         </h3>
-        <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
+        <div className="flex bg-surface-soft rounded-pill p-0.5 text-xs">
           <button
             onClick={() => onRoomTypeChange("double")}
             className={`px-3 py-1 rounded-md font-medium transition-colors ${
               roomType === "double"
-                ? "bg-white text-blue-600 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-surface-elevated text-ink"
+                : "text-muted hover:text-body"
             }`}
           >
             Doppelzimmer
@@ -236,8 +236,8 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
             onClick={() => onRoomTypeChange("single")}
             className={`px-3 py-1 rounded-md font-medium transition-colors ${
               roomType === "single"
-                ? "bg-white text-blue-600 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-surface-elevated text-ink"
+                : "text-muted hover:text-body"
             }`}
           >
             Einzelzimmer
@@ -248,7 +248,7 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Empty state */}
         {filtered.length === 0 ? (
-          <div className="flex-1 text-center text-gray-400 py-16">
+          <div className="flex-1 text-center text-muted py-16">
             <p className="text-lg">Keine Daten verfügbar</p>
             <p className="text-sm mt-1">
               Wähle Hotels aus und starte einen Abruf, um Preise zu sehen.
@@ -269,29 +269,30 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
                   key={`we-${i}`}
                   x1={span.start}
                   x2={span.end}
-                  fill="#e5e7eb"
+                  fill="#1f1f1f"
                   fillOpacity={1}
                   ifOverflow="hidden"
                 />
               ))}
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
               <XAxis
                 dataKey="date"
                 tickFormatter={formatDate}
-                tick={{ fontSize: isMobile ? 9 : 11 }}
+                tick={{ fontSize: isMobile ? 9 : 11, fill: "#999999" }}
                 interval="preserveStartEnd"
                 minTickGap={isMobile ? 30 : 40}
               />
               <YAxis
-                tick={{ fontSize: isMobile ? 9 : 11 }}
+                tick={{ fontSize: isMobile ? 9 : 11, fill: "#999999" }}
                 tickFormatter={(v) => `${v} €`}
                 width={isMobile ? 50 : 70}
+                axisLine={{ stroke: "#262626" }}
               />
               <Tooltip content={<CustomTooltip />} />
               {selectedDate && (
                 <ReferenceLine
                   x={selectedDate}
-                  stroke="#666"
+                  stroke="#999999"
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
                 />
@@ -356,9 +357,9 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
 
             {/* Selected date panel */}
             {selectedDate && selectedDatePrices.length > 0 && (
-              <div className="lg:w-72 flex-shrink-0 border border-gray-200 rounded-lg bg-gray-50 p-3 max-h-[500px] flex flex-col">
+              <div className="lg:w-72 flex-shrink-0 border border-hairline rounded-none bg-surface-soft p-3 max-h-[500px] flex flex-col">
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-sm text-gray-700">
+                  <h4 className="font-mono uppercase tracking-label-sm text-muted">
                     {new Date(selectedDate + "T00:00:00").toLocaleDateString("de-DE", {
                       weekday: "short",
                       day: "2-digit",
@@ -368,7 +369,7 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
                   </h4>
                   <button
                     onClick={() => setSelectedDate(null)}
-                    className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                    className="text-muted hover:text-body text-lg leading-none"
                     title="Auswahl aufheben"
                   >
                     &times;
@@ -378,27 +379,27 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
                   {selectedDatePrices.map((h, i) => (
                     <div
                       key={i}
-                      className="flex justify-between items-center gap-2 px-2 py-1 rounded hover:bg-white"
+                      className="flex justify-between items-center gap-2 px-2 py-1 rounded-none hover:bg-surface-elevated"
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span
                           className="inline-block w-2.5 h-0.5 flex-shrink-0 rounded"
                           style={{ backgroundColor: h.color }}
                         />
-                        <span className="truncate text-gray-700">{h.hotel_name}</span>
+                        <span className="truncate text-body">{h.hotel_name}</span>
                         {h.stars && (
-                          <span className="text-yellow-500 text-xs flex-shrink-0">
+                          <span className="text-warning text-xs flex-shrink-0">
                             {"★".repeat(h.stars)}
                           </span>
                         )}
                       </div>
-                      <span className="font-medium text-gray-900 flex-shrink-0">
+                      <span className="text-ink flex-shrink-0">
                         {h.price?.toFixed(0)} €
                       </span>
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-200 text-center">
+                <p className="text-xs text-muted mt-2 pt-2 border-t border-hairline text-center">
                   {selectedDatePrices.length} Hotels
                 </p>
               </div>
@@ -408,10 +409,10 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
       </div>
 
       {/* Custom interactive legend */}
-      <div className="mt-2 border-t pt-2">
+      <div className="mt-2 border-t border-hairline pt-2">
         <button
           onClick={() => setLegendOpen(!legendOpen)}
-          className="text-xs text-gray-500 hover:text-gray-700 mb-1 flex items-center gap-1"
+          className="text-xs text-muted hover:text-body mb-1 flex items-center gap-1"
         >
           <span
             className={`inline-block transition-transform ${

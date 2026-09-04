@@ -15,8 +15,8 @@ export default function StatusBar({
 }: Props) {
   if (loading || !status) {
     return (
-      <div className="bg-white rounded-lg shadow p-4 animate-pulse">
-        <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+      <div className="bg-surface-card border border-hairline rounded-none p-4 animate-pulse">
+        <div className="h-4 bg-surface-elevated rounded w-1/3"></div>
       </div>
     );
   }
@@ -30,41 +30,41 @@ export default function StatusBar({
     : "—";
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
+    <div className="bg-surface-card border border-hairline rounded-none p-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-6 text-sm">
           <div>
-            <span className="text-gray-500">Hotels:</span>{" "}
-            <span className="font-semibold">
+            <span className="text-muted">Hotels:</span>{" "}
+            <span className="text-body-strong">
               {status.active_hotels}/{status.total_hotels}
             </span>
           </div>
           <div>
-            <span className="text-gray-500">Preise:</span>{" "}
-            <span className="font-semibold">
+            <span className="text-muted">Preise:</span>{" "}
+            <span className="text-body-strong">
               {(status.total_prices ?? 0).toLocaleString("de-DE")}
             </span>
           </div>
           <div>
-            <span className="text-gray-500">Abdeckung:</span>{" "}
-            <span className="font-semibold">{status.coverage_pct}%</span>
-            <span className="text-gray-400 ml-1">
+            <span className="text-muted">Abdeckung:</span>{" "}
+            <span className="text-body-strong">{status.coverage_pct}%</span>
+            <span className="text-muted ml-1">
               ({status.dates_covered}/{status.dates_total} Tage)
             </span>
           </div>
           <div>
-            <span className="text-gray-500">Letzter Abruf:</span>{" "}
-            <span className="font-medium">{lastFetch}</span>
+            <span className="text-muted">Letzter Abruf:</span>{" "}
+            <span className="text-body">{lastFetch}</span>
           </div>
           <div>
-            <span className="text-gray-500">Nächster Abruf:</span>{" "}
-            <span className="font-medium">{nextRun}</span>
+            <span className="text-muted">Nächster Abruf:</span>{" "}
+            <span className="text-body">{nextRun}</span>
           </div>
           <div>
-            <span className="text-gray-500">Scheduler:</span>{" "}
+            <span className="text-muted">Scheduler:</span>{" "}
             <span
-              className={`font-semibold ${
-                status.scheduler_running ? "text-green-600" : "text-red-500"
+              className={`${
+                status.scheduler_running ? "text-success" : "text-danger"
               }`}
             >
               {status.scheduler_running ? "Aktiv" : "Inaktiv"}
@@ -75,7 +75,7 @@ export default function StatusBar({
           <button
             onClick={onFetch}
             disabled={fetching}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+            className="px-4 py-2 border border-ink text-ink rounded-pill font-mono uppercase tracking-label text-sm hover:bg-ink hover:text-canvas transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {fetching ? "Lädt..." : "Jetzt abrufen"}
           </button>

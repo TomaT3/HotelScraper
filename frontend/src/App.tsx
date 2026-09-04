@@ -369,7 +369,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400 text-sm">
+      <div className="min-h-screen flex items-center justify-center text-muted text-sm">
         Wird geladen…
       </div>
     );
@@ -434,18 +434,18 @@ export default function App() {
       {/* Fetch result notification */}
       {fetchResult && (
         <div
-          className={`rounded-lg p-3 text-sm ${
+          className={`text-sm ${
             fetchResult.errors.length > 0
-              ? "bg-yellow-50 text-yellow-800 border border-yellow-200"
-              : "bg-green-50 text-green-800 border border-green-200"
+              ? "text-warning border border-hairline-strong rounded-none p-3"
+              : "text-success border border-hairline-strong rounded-none p-3"
           }`}
         >
-          <span className="font-medium">Abruf abgeschlossen:</span>{" "}
+          <span className="text-body-strong">Abruf abgeschlossen:</span>{" "}
           {fetchResult.dates_fetched} Tage, {fetchResult.prices_saved} Preise
           gespeichert, {fetchResult.hotels_found} Hotels gefunden.
           {fetchResult.errors.length > 0 && (
             <details className="mt-1">
-              <summary className="cursor-pointer text-yellow-600">
+              <summary className="cursor-pointer text-warning">
                 {fetchResult.errors.length} Fehler anzeigen
               </summary>
               <ul className="mt-1 list-disc list-inside">
@@ -463,7 +463,7 @@ export default function App() {
         {/* Mobile filter toggle */}
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="lg:hidden flex items-center justify-between bg-white rounded-lg shadow p-3 text-sm font-medium text-gray-700 order-2"
+          className="lg:hidden flex items-center justify-between bg-surface-card border border-hairline rounded-none p-3 text-sm text-body order-2"
         >
           <span>Filter & Einstellungen</span>
           <ChevronDown

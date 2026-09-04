@@ -5,6 +5,7 @@
 @layer base {
   body {
     @apply bg-canvas text-body font-mono antialiased;
+    color-scheme: dark;
   }
   h1, h2, h3, h4 {
     @apply font-display uppercase text-ink;
