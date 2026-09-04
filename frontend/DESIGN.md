@@ -8,7 +8,7 @@ colors:
   body: "#cccccc"
   body-strong: "#e6e6e6"
   muted: "#999999"
-  muted-soft: "#666666"
+  muted-soft: "#757575"
   hairline: "#262626"
   hairline-strong: "#3a3a3a"
   canvas: "#000000"
@@ -234,7 +234,7 @@ The original Bugatti body voice (a serif text face) is deliberately swapped for 
 - **Body** (`{colors.body}` — #cccccc): Default running text (slightly cooler than pure white).
 - **Body Strong** (`{colors.body-strong}` — #e6e6e6): Emphasized values, primary numbers.
 - **Muted** (`{colors.muted}` — #999999): Metadata, dates, captions, secondary labels.
-- **Muted Soft** (`{colors.muted-soft}` — #666666): Very-secondary text (empty states, fine print).
+- **Muted Soft** (`{colors.muted-soft}` — #757575): Very-secondary text (empty states, fine print).
 
 ### Semantic
 - **Success** (`{colors.success}` — #5fa657): Scheduler active, fetch-complete states.
