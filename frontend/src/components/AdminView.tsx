@@ -259,9 +259,10 @@ export default function AdminView({ currentUserId }: Props) {
         setError(null);
         setSuccess(null);
       }}
+      aria-pressed={tab === id}
       className={`px-4 py-2 rounded-pill text-xs font-mono uppercase tracking-label-sm transition-colors ${
         tab === id
-          ? "border border-ink text-ink"
+          ? "border border-ink text-ink bg-surface-elevated"
           : "border border-hairline-strong text-muted hover:text-body"
       }`}
     >
@@ -270,7 +271,7 @@ export default function AdminView({ currentUserId }: Props) {
   );
 
   const inputClass =
-    "mt-1 w-full py-2 bg-canvas border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:border-ink";
+    "mt-1 w-full py-2 bg-canvas border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:border-ink";
   const labelClass = "block font-mono text-xs uppercase tracking-label-sm text-muted";
 
   return (

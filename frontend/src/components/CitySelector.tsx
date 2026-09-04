@@ -19,6 +19,7 @@ export default function CitySelector({
         <button
           key={city.name}
           onClick={() => onCityChange(city.name)}
+          aria-pressed={selectedCity === city.name}
           className={`px-4 py-1.5 text-sm font-mono uppercase tracking-label-sm rounded-pill border transition-colors ${
             selectedCity === city.name
               ? "border-ink text-ink"

@@ -11,6 +11,7 @@ import {
   ReferenceArea,
 } from "recharts";
 import type { HotelPrices } from "../api/types";
+import { CHART_COLORS } from "../theme/chartColors";
 
 interface Props {
   data: HotelPrices[];
@@ -18,14 +19,6 @@ interface Props {
   roomType: "single" | "double";
   onRoomTypeChange: (type: "single" | "double") => void;
 }
-
-// Distinct colors for up to 20 hotels
-const COLORS = [
-  "#60a5fa", "#f87171", "#4ade80", "#fb923c", "#c084fc",
-  "#22d3ee", "#facc15", "#f472b6", "#a5b4fc", "#34d399",
-  "#fbbf24", "#e879f9", "#38bdf8", "#fb7185", "#a3e635",
-  "#d946ef", "#2dd4bf", "#fca5a5", "#93c5fd", "#fcd34d",
-];
 
 interface ChartDataPoint {
   date: string;
@@ -109,7 +102,7 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
 
     for (const hotel of filtered) {
       const name = hotel.hotel_name;
-      const color = COLORS[filtered.indexOf(hotel) % COLORS.length];
+      const color = CHART_COLORS[filtered.indexOf(hotel) % CHART_COLORS.length];
       let prevIdx: number | null = null;
 
       for (let i = 0; i < chartData.length; i++) {
@@ -150,7 +143,7 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
           hotel_name: hotel.hotel_name,
           stars: hotel.stars,
           price: point[hotel.hotel_name] as number | undefined,
-          color: COLORS[filtered.indexOf(hotel) % COLORS.length],
+          color: CHART_COLORS[filtered.indexOf(hotel) % CHART_COLORS.length],
         }))
         .filter((h) => h.price !== undefined)
         .sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
@@ -224,7 +217,8 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
         <div className="flex bg-surface-soft rounded-pill p-0.5 text-xs">
           <button
             onClick={() => onRoomTypeChange("double")}
-            className={`px-3 py-1 rounded-md font-medium transition-colors ${
+            aria-pressed={roomType === "double"}
+            className={`px-3 py-1 rounded-pill transition-colors ${
               roomType === "double"
                 ? "bg-surface-elevated text-ink"
                 : "text-muted hover:text-body"
@@ -234,7 +228,8 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
           </button>
           <button
             onClick={() => onRoomTypeChange("single")}
-            className={`px-3 py-1 rounded-md font-medium transition-colors ${
+            aria-pressed={roomType === "single"}
+            className={`px-3 py-1 rounded-pill transition-colors ${
               roomType === "single"
                 ? "bg-surface-elevated text-ink"
                 : "text-muted hover:text-body"
@@ -298,7 +293,7 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
                 />
               )}
               {filtered.map((hotel, i) => {
-                const color = COLORS[i % COLORS.length];
+                const color = CHART_COLORS[i % CHART_COLORS.length];
                 const isHovered = hoveredHotel === hotel.hotel_name;
                 const strokeW = isHovered ? 3 : isMany ? 1.5 : 2;
                 const opacity = hoveredHotel
@@ -440,7 +435,7 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
               >
                 <span
                   className="inline-block w-3 h-0.5 flex-shrink-0"
-                  style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                  style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
                 />
                 {hotel.hotel_name}
               </span>
