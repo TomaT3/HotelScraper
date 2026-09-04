@@ -56,15 +56,21 @@ export default function HotelFilter({
       </div>
 
       {/* Star filter */}
-      <div className="flex gap-2 mb-3">
+      <div
+        className="flex gap-2 mb-3"
+        role="radiogroup"
+        aria-label="Sterne-Filter"
+      >
         {STAR_OPTIONS.map((s) => (
           <button
             key={s ?? "all"}
             onClick={() => onStarFilterChange(s)}
+            role="radio"
+            aria-checked={starFilter === s}
             className={`px-2 py-1 text-xs rounded-pill font-mono uppercase tracking-label-sm transition-colors ${
               starFilter === s
-                ? "border border-ink text-ink"
-                : "bg-surface-soft text-muted hover:bg-surface-elevated"
+                ? "border border-ink text-ink bg-surface-elevated"
+                : "bg-surface-soft text-muted hover:text-body hover:bg-surface-elevated"
             }`}
           >
             {s === null ? "Alle" : `${s} ★`}
@@ -78,7 +84,7 @@ export default function HotelFilter({
         placeholder="Hotel suchen..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full py-2 bg-transparent border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:border-ink mb-3"
+        className="w-full py-2 bg-transparent border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:border-ink mb-3"
       />
 
       {/* Hotel list */}

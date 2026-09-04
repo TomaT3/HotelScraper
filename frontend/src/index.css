@@ -18,4 +18,11 @@
     outline: 1px solid theme("colors.ink");
     outline-offset: 2px;
   }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: theme("colors.link");
+  }
 }

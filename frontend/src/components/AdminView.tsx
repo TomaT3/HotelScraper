@@ -259,9 +259,11 @@ export default function AdminView({ currentUserId }: Props) {
         setError(null);
         setSuccess(null);
       }}
+      role="radio"
+      aria-checked={tab === id}
       className={`px-4 py-2 rounded-pill text-xs font-mono uppercase tracking-label-sm transition-colors ${
         tab === id
-          ? "border border-ink text-ink"
+          ? "border border-ink text-ink bg-surface-elevated"
           : "border border-hairline-strong text-muted hover:text-body"
       }`}
     >
@@ -270,14 +272,18 @@ export default function AdminView({ currentUserId }: Props) {
   );
 
   const inputClass =
-    "mt-1 w-full py-2 bg-canvas border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:border-ink";
+    "mt-1 w-full py-2 bg-canvas border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:border-ink";
   const labelClass = "block font-mono text-xs uppercase tracking-label-sm text-muted";
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <h2 className="font-display uppercase tracking-display-md text-ink">Verwaltung</h2>
-        <div className="flex gap-2">
+        <div
+          className="flex gap-2"
+          role="radiogroup"
+          aria-label="Verwaltungsbereich"
+        >
           {tabButton("tenants", "Tenants")}
           {tabButton("users", "Benutzer")}
         </div>

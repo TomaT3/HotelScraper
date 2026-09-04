@@ -76,7 +76,7 @@ function LoginForm() {
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full py-2 bg-transparent border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:border-ink"
+              className="mt-1 w-full py-2 bg-transparent border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:border-ink"
               placeholder="name@hotel.de"
             />
           </div>
@@ -91,7 +91,7 @@ function LoginForm() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full py-2 bg-transparent border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:border-ink"
+              className="mt-1 w-full py-2 bg-transparent border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:border-ink"
             />
           </div>
           {error && (
@@ -401,6 +401,7 @@ export default function App() {
           {isAdmin && (
             <button
               onClick={() => setView(view === "admin" ? "dashboard" : "admin")}
+              aria-pressed={view === "admin"}
               className={`px-4 py-1.5 text-xs font-mono uppercase tracking-label-sm rounded-pill border transition-colors ${
                 view === "admin"
                   ? "border-ink text-ink"
@@ -436,8 +437,8 @@ export default function App() {
         <div
           className={`text-sm ${
             fetchResult.errors.length > 0
-              ? "text-warning border border-hairline-strong rounded-none p-3"
-              : "text-success border border-hairline-strong rounded-none p-3"
+              ? "text-warning border-l-2 border-warning bg-surface-soft rounded-none p-3"
+              : "text-success border-l-2 border-success bg-surface-soft rounded-none p-3"
           }`}
         >
           <span className="text-body-strong">Abruf abgeschlossen:</span>{" "}

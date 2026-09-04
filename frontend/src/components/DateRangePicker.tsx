@@ -15,7 +15,7 @@ export default function DateRangePicker({ from, to, onChange }: Props) {
             type="date"
             value={from}
             onChange={(e) => onChange(e.target.value, to)}
-            className="bg-transparent border-b border-hairline-strong rounded-none py-1.5 text-sm text-ink focus:outline-none focus:border-ink w-full"
+            className="bg-transparent border-b border-hairline-strong rounded-none py-1.5 text-sm text-ink focus:border-ink w-full"
           />
         </div>
         <span className="text-muted mt-5">—</span>
@@ -25,7 +25,7 @@ export default function DateRangePicker({ from, to, onChange }: Props) {
             type="date"
             value={to}
             onChange={(e) => onChange(from, e.target.value)}
-            className="bg-transparent border-b border-hairline-strong rounded-none py-1.5 text-sm text-ink focus:outline-none focus:border-ink w-full"
+            className="bg-transparent border-b border-hairline-strong rounded-none py-1.5 text-sm text-ink focus:border-ink w-full"
           />
         </div>
       </div>
