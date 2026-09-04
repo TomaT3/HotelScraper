@@ -19,10 +19,10 @@ export default function CitySelector({
         <button
           key={city.name}
           onClick={() => onCityChange(city.name)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`px-4 py-1.5 text-sm font-mono uppercase tracking-label-sm rounded-pill border transition-colors ${
             selectedCity === city.name
-              ? "bg-blue-600 text-white shadow-sm"
-              : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+              ? "border-ink text-ink"
+              : "border-hairline-strong text-muted hover:text-body"
           }`}
           title={city.dest_label ?? city.name}
         >

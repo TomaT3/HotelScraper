@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+@layer base {
+  body {
+    @apply bg-canvas text-body font-mono antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display uppercase text-ink;
+  }
+  ::selection {
+    background-color: theme("colors.link");
+    color: theme("colors.canvas");
+  }
+  :focus-visible {
+    outline: 1px solid theme("colors.ink");
+    outline-offset: 2px;
+  }
 }
