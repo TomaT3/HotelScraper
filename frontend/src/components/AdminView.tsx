@@ -81,6 +81,13 @@ export default function AdminView({ currentUserId }: Props) {
   // User form (create)
   const [userForm, setUserForm] = useState<UserForm>(emptyUserForm);
 
+  // Password reset form (inline, replaces window.prompt)
+  const [resetTarget, setResetTarget] = useState<UserAdmin | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+
   const reloadTenants = useCallback(async () => {
     setLoadingTenants(true);
     try {
@@ -223,20 +230,45 @@ export default function AdminView({ currentUserId }: Props) {
     }
   };
 
-  const handleResetPassword = async (u: UserAdmin) => {
-    const password = window.prompt(`Neues Passwort für ${u.email}:`);
-    if (!password) return;
-    if (password.length < 8) {
-      setError("Das Passwort muss mindestens 8 Zeichen lang sein.");
-      return;
-    }
+  const startResetPassword = (u: UserAdmin) => {
     setError(null);
     setSuccess(null);
+    setResetTarget(u);
+    setResetPassword("");
+    setResetConfirm("");
+    setResetError(null);
+  };
+
+  const cancelResetPassword = () => {
+    setResetTarget(null);
+    setResetPassword("");
+    setResetConfirm("");
+    setResetError(null);
+  };
+
+  const handleResetSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!resetTarget) return;
+    setResetError(null);
+
+    if (resetPassword.length < 8) {
+      setResetError("Das Passwort muss mindestens 8 Zeichen lang sein.");
+      return;
+    }
+    if (resetPassword !== resetConfirm) {
+      setResetError("Passwörter stimmen nicht überein.");
+      return;
+    }
+
+    setResetSubmitting(true);
     try {
-      await resetUserPassword(u.id, password);
-      setSuccess(`Passwort für ${u.email} zurückgesetzt.`);
+      await resetUserPassword(resetTarget.id, resetPassword);
+      setSuccess(`Passwort für ${resetTarget.email} zurückgesetzt.`);
+      cancelResetPassword();
     } catch (err) {
-      setError(`Passwort zurücksetzen fehlgeschlagen: ${errorDetail(err)}`);
+      setResetError(`Passwort zurücksetzen fehlgeschlagen: ${errorDetail(err)}`);
+    } finally {
+      setResetSubmitting(false);
     }
   };
 
@@ -258,6 +290,7 @@ export default function AdminView({ currentUserId }: Props) {
         setTab(id);
         setError(null);
         setSuccess(null);
+        setResetTarget(null);
       }}
       role="radio"
       aria-checked={tab === id}
@@ -434,6 +467,66 @@ export default function AdminView({ currentUserId }: Props) {
           </div>
         </div>
       ) : (
+        <>
+        {resetTarget && (
+          <div className="bg-surface-card border border-hairline rounded-none p-4 max-w-md space-y-3">
+            <h3 className="font-display uppercase tracking-display-md text-ink">
+              Passwort zurücksetzen für {resetTarget.email}
+            </h3>
+            <form onSubmit={handleResetSubmit} className="space-y-3">
+              <div>
+                <label htmlFor="reset-password" className={labelClass}>
+                  Neues Passwort
+                </label>
+                <input
+                  id="reset-password"
+                  type="password"
+                  required
+                  autoComplete="off"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  className={inputClass}
+                  placeholder="mindestens 8 Zeichen"
+                />
+              </div>
+              <div>
+                <label htmlFor="reset-confirm" className={labelClass}>
+                  Neues Passwort wiederholen
+                </label>
+                <input
+                  id="reset-confirm"
+                  type="password"
+                  required
+                  autoComplete="off"
+                  value={resetConfirm}
+                  onChange={(e) => setResetConfirm(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              {resetError && (
+                <div className="text-sm text-danger border border-hairline-strong rounded-none px-3 py-2">
+                  {resetError}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={resetSubmitting}
+                  className="px-4 py-2 border border-ink text-ink rounded-pill font-mono uppercase tracking-label text-sm hover:bg-ink hover:text-canvas transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {resetSubmitting ? "Speichern…" : "Speichern"}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelResetPassword}
+                  className="px-4 py-2 text-sm border border-hairline-strong rounded-pill font-mono uppercase tracking-label text-muted hover:text-body transition-colors"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* User list */}
           <div className="lg:col-span-2">
@@ -502,7 +595,7 @@ export default function AdminView({ currentUserId }: Props) {
                                 {u.is_active ? "Deaktivieren" : "Aktivieren"}
                               </button>
                               <button
-                                onClick={() => handleResetPassword(u)}
+                                onClick={() => startResetPassword(u)}
                                 className="px-2 py-1 text-xs border border-hairline-strong rounded-pill font-mono uppercase tracking-label-sm text-muted hover:text-body transition-colors"
                               >
                                 Passwort zurücksetzen
@@ -619,6 +712,7 @@ export default function AdminView({ currentUserId }: Props) {
             </form>
           </div>
         </div>
+        </>
       )}
     </div>
   );

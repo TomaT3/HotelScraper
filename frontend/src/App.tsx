@@ -9,6 +9,7 @@ import { ChevronDown } from "./components/Icons";
 import { useAuth } from "./auth/AuthContext";
 import {
   addToWatchlist,
+  changePassword,
   getCities,
   getConfig,
   getHotels,
@@ -112,6 +113,137 @@ function LoginForm() {
   );
 }
 
+/**
+ * Extracts the backend `detail` field from an API error message
+ * ("API error 400: {\"detail\":\"...\"}") for inline display.
+ */
+function apiErrorDetail(err: unknown): string {
+  if (err instanceof Error) {
+    const m = err.message.match(/API error \d+: (.+)/);
+    if (m) {
+      try {
+        const parsed = JSON.parse(m[1]);
+        if (parsed && typeof parsed.detail === "string") return parsed.detail;
+      } catch {
+        // fall through to raw message
+      }
+      return m[1];
+    }
+    return err.message;
+  }
+  return String(err);
+}
+
+function PasswordChangePanel({ onClose }: { onClose: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const labelClass = "block font-mono text-xs uppercase tracking-label-sm text-muted";
+  const inputClass =
+    "mt-1 w-full py-2 bg-transparent border-0 border-b border-hairline-strong rounded-none text-sm text-ink placeholder:text-muted-soft focus:border-ink";
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    if (newPassword.length < 8) {
+      setError("Das Passwort muss mindestens 8 Zeichen lang sein.");
+      return;
+    }
+    if (newPassword !== confirm) {
+      setError("Passwörter stimmen nicht überein.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirm("");
+      setSuccess("Passwort geändert.");
+      window.setTimeout(() => onClose(), 1500);
+    } catch (err) {
+      setError(`Passwort ändern fehlgeschlagen: ${apiErrorDetail(err)}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bg-surface-card border border-hairline rounded-none p-4 max-w-sm space-y-3">
+      <h2 className="font-display uppercase tracking-display-md text-ink">Passwort ändern</h2>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label htmlFor="change-current" className={labelClass}>
+            Aktuelles Passwort
+          </label>
+          <input
+            id="change-current"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="change-new" className={labelClass}>
+            Neues Passwort
+          </label>
+          <input
+            id="change-new"
+            type="password"
+            required
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className={inputClass}
+            placeholder="mindestens 8 Zeichen"
+          />
+        </div>
+        <div>
+          <label htmlFor="change-confirm" className={labelClass}>
+            Neues Passwort wiederholen
+          </label>
+          <input
+            id="change-confirm"
+            type="password"
+            required
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+        {error && (
+          <div className="text-sm text-danger border border-hairline-strong rounded-none px-3 py-2">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="text-sm text-success border border-hairline-strong rounded-none px-3 py-2">
+            {success}
+          </div>
+        )}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="px-4 py-2 border border-ink text-ink rounded-pill font-mono uppercase tracking-label text-sm hover:bg-ink hover:text-canvas transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {submitting ? "Speichern…" : "Speichern"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function App() {
   const { user, loading, logout } = useAuth();
   const [cities, setCities] = useState<City[]>([]);
@@ -132,6 +264,7 @@ export default function App() {
   const [version, setVersion] = useState<string | null>(null);
   const [roomType, setRoomType] = useState<"single" | "double">("double");
   const [view, setView] = useState<"dashboard" | "admin">("dashboard");
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
 
   const isAdmin = user?.role === "admin";
 
@@ -357,6 +490,7 @@ export default function App() {
   const handleLogout = useCallback(async () => {
     await logout();
     setView("dashboard");
+    setShowPasswordForm(false);
     setCities([]);
     setSelectedCity("");
     setHotels([]);
@@ -412,6 +546,13 @@ export default function App() {
             </button>
           )}
           <button
+            onClick={() => setShowPasswordForm(!showPasswordForm)}
+            aria-pressed={showPasswordForm}
+            className="px-4 py-1.5 text-xs font-mono uppercase tracking-label-sm rounded-pill border border-hairline-strong text-muted hover:text-body transition-colors"
+          >
+            Passwort
+          </button>
+          <button
             onClick={handleLogout}
             className="px-4 py-1.5 text-xs font-mono uppercase tracking-label-sm rounded-pill border border-hairline-strong text-muted hover:text-body transition-colors"
           >
@@ -419,6 +560,8 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      {showPasswordForm && <PasswordChangePanel onClose={() => setShowPasswordForm(false)} />}
 
       {view === "admin" && isAdmin ? (
         <AdminView currentUserId={user.id} />

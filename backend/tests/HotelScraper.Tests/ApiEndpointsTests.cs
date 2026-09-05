@@ -362,6 +362,52 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // ── Change password (self-service) ───────────────────────────────
+
+    [Fact]
+    public async Task ChangePassword_CorrectCurrentPassword_UpdatesPasswordAndNewLoginWorks()
+    {
+        // user@stuttgart.test (seeded with UserPass1!) — test handler must act as that exact user
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+        var client = _factory.CreateClientAs("user", tenantId: 1, cities: ["Stuttgart"], userId: user.Id);
+
+        var change = await client.PostAsJsonAsync("/api/auth/change-password",
+            new { current_password = "UserPass1!", new_password = "NewPass1!" });
+        change.EnsureSuccessStatusCode();
+
+        // Old password no longer works
+        var loginOld = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "UserPass1!" });
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, loginOld.StatusCode);
+
+        // New password works
+        var loginNew = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "NewPass1!" });
+        loginNew.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task ChangePassword_WrongCurrentPassword_Returns400()
+    {
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+        var client = _factory.CreateClientAs("user", tenantId: 1, cities: ["Stuttgart"], userId: user.Id);
+
+        var response = await client.PostAsJsonAsync("/api/auth/change-password",
+            new { current_password = "WrongPass1!", new_password = "NewPass1!" });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangePassword_ShortNewPassword_Returns400()
+    {
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+        var client = _factory.CreateClientAs("user", tenantId: 1, cities: ["Stuttgart"], userId: user.Id);
+
+        var response = await client.PostAsJsonAsync("/api/auth/change-password",
+            new { current_password = "UserPass1!", new_password = "short" });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     // ── Deactivation & claim refresh (per-request validation via real cookie) ──
 
     [Fact]

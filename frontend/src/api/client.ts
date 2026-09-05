@@ -194,3 +194,11 @@ export async function resetUserPassword(
     body: JSON.stringify({ password }),
   });
 }
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>(`${BASE}/auth/change-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}

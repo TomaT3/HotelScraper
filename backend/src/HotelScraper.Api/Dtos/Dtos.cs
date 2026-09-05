@@ -125,6 +125,11 @@ public record ResetPasswordIn(
     [property: JsonPropertyName("password")] string Password
 );
 
+public record ChangePasswordIn(
+    [property: JsonPropertyName("current_password")] string CurrentPassword,
+    [property: JsonPropertyName("new_password")] string NewPassword
+);
+
 public record UserPatchIn(
     [property: JsonPropertyName("is_active")] bool? IsActive,
     [property: JsonPropertyName("role")] string? Role,

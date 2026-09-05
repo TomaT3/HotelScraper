@@ -79,6 +79,36 @@ public static class AuthEndpoints
             ));
         }).RequireAuthorization();
 
+        group.MapPost("/change-password", async (
+            ChangePasswordIn body,
+            AuthService auth,
+            AppDbContext db,
+            ClaimsPrincipal principal,
+            CancellationToken ct) =>
+        {
+            var userIdClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
+                return Results.Unauthorized();
+
+            if (string.IsNullOrWhiteSpace(body.CurrentPassword) || string.IsNullOrWhiteSpace(body.NewPassword))
+                return Results.BadRequest(new { detail = "Bitte aktuelles und neues Passwort angeben." });
+
+            if (body.NewPassword.Length < 8)
+                return Results.BadRequest(new { detail = "Passwort muss mindestens 8 Zeichen lang sein" });
+
+            var user = await db.Users.FindAsync([userId], ct);
+            if (user is null || !user.IsActive)
+                return Results.Unauthorized();
+
+            if (!auth.VerifyPassword(body.CurrentPassword, user.PasswordHash))
+                return Results.BadRequest(new { detail = "Aktuelles Passwort ist falsch" });
+
+            user.PasswordHash = auth.HashPassword(body.NewPassword);
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new { ok = true });
+        }).RequireAuthorization();
+
         return group;
     }
 }
