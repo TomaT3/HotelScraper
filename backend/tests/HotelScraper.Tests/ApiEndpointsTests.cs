@@ -362,6 +362,118 @@ public class ApiEndpointsTests : IClassFixture<CustomWebApplicationFactory>, IAs
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // ── Change password (self-service) ───────────────────────────────
+
+    [Fact]
+    public async Task ChangePassword_CorrectCurrentPassword_UpdatesPasswordAndNewLoginWorks()
+    {
+        // user@stuttgart.test (seeded with UserPass1!) — test handler must act as that exact user
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+        var client = _factory.CreateClientAs("user", tenantId: 1, cities: ["Stuttgart"], userId: user.Id);
+
+        var change = await client.PostAsJsonAsync("/api/auth/change-password",
+            new { current_password = "UserPass1!", new_password = "NewPass1!" });
+        change.EnsureSuccessStatusCode();
+
+        // Old password no longer works
+        var loginOld = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "UserPass1!" });
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, loginOld.StatusCode);
+
+        // New password works
+        var loginNew = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "NewPass1!" });
+        loginNew.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task ChangePassword_WrongCurrentPassword_Returns400()
+    {
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+        var client = _factory.CreateClientAs("user", tenantId: 1, cities: ["Stuttgart"], userId: user.Id);
+
+        var response = await client.PostAsJsonAsync("/api/auth/change-password",
+            new { current_password = "WrongPass1!", new_password = "NewPass1!" });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangePassword_ShortNewPassword_Returns400()
+    {
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+        var client = _factory.CreateClientAs("user", tenantId: 1, cities: ["Stuttgart"], userId: user.Id);
+
+        var response = await client.PostAsJsonAsync("/api/auth/change-password",
+            new { current_password = "UserPass1!", new_password = "short" });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // ── Session invalidation on password change (per-request validation via real cookie) ──
+
+    [Fact]
+    public async Task ChangePassword_InvalidatesExistingSessionCookie()
+    {
+        // Real cookie login (no X-Test-Auth header) on a dedicated client
+        var client = _factory.CreateClient();
+        var login = await client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "UserPass1!" });
+        login.EnsureSuccessStatusCode();
+
+        // The cookie's IssuedUtc is persisted with second granularity — the change
+        // must land in a LATER second than the login, or the old cookie would be
+        // indistinguishable from one issued after the change.
+        await Task.Delay(1100);
+
+        // Change the password while the original cookie is still in the jar
+        var change = await client.PostAsJsonAsync("/api/auth/change-password",
+            new { current_password = "UserPass1!", new_password = "NewPass1!" });
+        change.EnsureSuccessStatusCode();
+
+        // The cookie issued before the change must no longer grant access
+        var rejected = await client.GetAsync("/api/auth/me");
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, rejected.StatusCode);
+
+        // Re-login with the new password issues a fresh cookie that works —
+        // even when it happens in the same second as the change.
+        var loginNew = await client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "NewPass1!" });
+        loginNew.EnsureSuccessStatusCode();
+        var me = await client.GetAsync("/api/auth/me");
+        me.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task AdminResetPassword_InvalidatesUsersExistingSession()
+    {
+        // user@stuttgart.test logs in with a real cookie
+        var client = _factory.CreateClient();
+        var login = await client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "UserPass1!" });
+        login.EnsureSuccessStatusCode();
+
+        // Cookie IssuedUtc has second granularity — reset must land in a later
+        // second than the login (see ChangePassword_InvalidatesExistingSessionCookie).
+        await Task.Delay(1100);
+
+        // Admin resets the password after the cookie was issued
+        var user = await _db.Users.FirstAsync(u => u.Email == "user@stuttgart.test");
+        var admin = AdminClient();
+        var reset = await admin.PostAsJsonAsync($"/api/admin/users/{user.Id}/reset-password",
+            new { password = "AdminReset1!" });
+        reset.EnsureSuccessStatusCode();
+
+        // The cookie issued before the reset must no longer grant access
+        var rejected = await client.GetAsync("/api/auth/me");
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, rejected.StatusCode);
+
+        // Re-login with the reset password issues a fresh cookie that works
+        var loginNew = await client.PostAsJsonAsync("/api/auth/login",
+            new { email = "user@stuttgart.test", password = "AdminReset1!" });
+        loginNew.EnsureSuccessStatusCode();
+        var me = await client.GetAsync("/api/auth/me");
+        me.EnsureSuccessStatusCode();
+    }
+
     // ── Deactivation & claim refresh (per-request validation via real cookie) ──
 
     [Fact]

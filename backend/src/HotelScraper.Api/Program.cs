@@ -82,6 +82,27 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                 return;
             }
 
+            // Reject sessions issued before the last password change — a password
+            // change (self-service or admin reset) must invalidate any cookie that
+            // predates it (stolen-session protection).
+            //
+            // Compare at whole-second granularity: the cookie handler serializes
+            // IssuedUtc with RFC 1123 ("r"), which drops sub-second precision.
+            // Without flooring PasswordChangedAt, a session issued in the SAME
+            // second as the change would look older than it is and be wrongly
+            // rejected on the very next request after a re-login.
+            if (user.PasswordChangedAt is { } changedAt && ctx.Properties.IssuedUtc is { } issuedUtc)
+            {
+                var changedUtc = DateTime.SpecifyKind(changedAt, DateTimeKind.Utc); // SQLite reads back Kind=Unspecified
+                var changedSecond = changedUtc.AddTicks(-(changedUtc.Ticks % TimeSpan.TicksPerSecond));
+                if (changedSecond > issuedUtc.UtcDateTime)
+                {
+                    ctx.RejectPrincipal();
+                    ctx.HttpContext.Response.Cookies.Delete(options.Cookie.Name);
+                    return;
+                }
+            }
+
             // Refresh the role claim so role changes (e.g. a demoted admin) take
             // effect immediately instead of lingering until cookie expiry — the
             // same staleness class as the deactivation check above.

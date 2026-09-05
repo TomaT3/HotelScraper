@@ -175,6 +175,7 @@ public static class AdminEndpoints
                 return Results.NotFound(new { detail = "User not found" });
 
             user.PasswordHash = auth.HashPassword(body.Password);
+            user.PasswordChangedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
             return Results.Ok(new { ok = true, id = user.Id });
         });
