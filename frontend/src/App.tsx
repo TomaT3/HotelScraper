@@ -20,6 +20,7 @@ import {
   removeFromWatchlist,
   triggerFetch,
 } from "./api/client";
+import { apiErrorDetail } from "./api/error";
 import type { City, Hotel, HotelPrices, Status, FetchResult } from "./api/types";
 
 function todayStr(): string {
@@ -113,28 +114,13 @@ function LoginForm() {
   );
 }
 
-/**
- * Extracts the backend `detail` field from an API error message
- * ("API error 400: {\"detail\":\"...\"}") for inline display.
- */
-function apiErrorDetail(err: unknown): string {
-  if (err instanceof Error) {
-    const m = err.message.match(/API error \d+: (.+)/);
-    if (m) {
-      try {
-        const parsed = JSON.parse(m[1]);
-        if (parsed && typeof parsed.detail === "string") return parsed.detail;
-      } catch {
-        // fall through to raw message
-      }
-      return m[1];
-    }
-    return err.message;
-  }
-  return String(err);
-}
-
-function PasswordChangePanel({ onClose }: { onClose: () => void }) {
+function PasswordChangePanel({
+  onClose,
+  onPasswordChanged,
+}: {
+  onClose: () => void;
+  onPasswordChanged: () => void;
+}) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -166,8 +152,8 @@ function PasswordChangePanel({ onClose }: { onClose: () => void }) {
       setCurrentPassword("");
       setNewPassword("");
       setConfirm("");
-      setSuccess("Passwort geändert.");
-      window.setTimeout(() => onClose(), 1500);
+      setSuccess("Passwort geändert. Bitte melden Sie sich neu an.");
+      window.setTimeout(() => onPasswordChanged(), 2200);
     } catch (err) {
       setError(`Passwort ändern fehlgeschlagen: ${apiErrorDetail(err)}`);
     } finally {
@@ -561,7 +547,12 @@ export default function App() {
         </div>
       </div>
 
-      {showPasswordForm && <PasswordChangePanel onClose={() => setShowPasswordForm(false)} />}
+      {showPasswordForm && (
+        <PasswordChangePanel
+          onClose={() => setShowPasswordForm(false)}
+          onPasswordChanged={handleLogout}
+        />
+      )}
 
       {view === "admin" && isAdmin ? (
         <AdminView currentUserId={user.id} />
