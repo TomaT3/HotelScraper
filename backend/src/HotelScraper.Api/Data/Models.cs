@@ -143,6 +143,9 @@ public class AppUser
     [Column("password_hash")]
     public string PasswordHash { get; set; } = "";
 
+    [Column("password_changed_at")]
+    public DateTime? PasswordChangedAt { get; set; }
+
     [Column("tenant_id")]
     public int? TenantId { get; set; }
 

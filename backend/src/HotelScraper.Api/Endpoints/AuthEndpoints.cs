@@ -104,6 +104,7 @@ public static class AuthEndpoints
                 return Results.BadRequest(new { detail = "Aktuelles Passwort ist falsch" });
 
             user.PasswordHash = auth.HashPassword(body.NewPassword);
+            user.PasswordChangedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
 
             return Results.Ok(new { ok = true });
