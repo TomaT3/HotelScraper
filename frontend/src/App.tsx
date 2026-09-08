@@ -640,7 +640,15 @@ export default function App() {
 
         {/* Main chart area – shown first on mobile */}
         <div className="lg:col-span-3 order-1 lg:order-2">
-          <HotelChart data={prices} selectedIds={selectedIds} roomType={roomType} onRoomTypeChange={setRoomType} />
+          <HotelChart
+            data={prices}
+            selectedIds={selectedIds}
+            roomType={roomType}
+            onRoomTypeChange={setRoomType}
+            favorites={favorites.get(selectedCity) ?? new Set()}
+            onToggleSelected={handleToggle}
+            onToggleFavorite={handleToggleFavorite}
+          />
         </div>
       </div>
 

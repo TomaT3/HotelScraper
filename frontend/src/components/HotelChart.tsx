@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
   ReferenceArea,
+  Brush,
 } from "recharts";
 import type { HotelPrices } from "../api/types";
 import { CHART_COLORS } from "../theme/chartColors";
@@ -18,6 +19,9 @@ interface Props {
   selectedIds: Set<number>;
   roomType: "single" | "double";
   onRoomTypeChange: (type: "single" | "double") => void;
+  favorites: Set<number>;
+  onToggleSelected: (id: number) => void;
+  onToggleFavorite: (id: number) => void;
 }
 
 interface ChartDataPoint {
@@ -35,8 +39,17 @@ function useWindowWidth() {
   return width;
 }
 
-export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChange }: Props) {
+export default function HotelChart({
+  data,
+  selectedIds,
+  roomType,
+  onRoomTypeChange,
+  favorites,
+  onToggleSelected,
+  onToggleFavorite,
+}: Props) {
   const [hoveredHotel, setHoveredHotel] = useState<string | null>(null);
+  const [selectedHotelId, setSelectedHotelId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(true);
   const windowWidth = useWindowWidth();
@@ -185,19 +198,18 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
             year: "numeric",
           })}
         </p>
-        {items.length > 5 ? (
-          <p className="text-muted text-xs italic">
-            {items.length} Hotels · Klicke für Details
+        {items.slice(0, 5).map((entry: any, i: number) => (
+          <div key={i} className="flex justify-between gap-4">
+            <span style={{ color: entry.color }} className="truncate">
+              {entry.name}
+            </span>
+            <span className="text-body-strong">{entry.value?.toFixed(0)} €</span>
+          </div>
+        ))}
+        {items.length > 5 && (
+          <p className="text-muted text-xs mt-1">
+            … +{items.length - 5} weitere
           </p>
-        ) : (
-          items.map((entry: any, i: number) => (
-            <div key={i} className="flex justify-between gap-4">
-              <span style={{ color: entry.color }} className="truncate">
-                {entry.name}
-              </span>
-              <span className="text-body-strong">{entry.value?.toFixed(0)} €</span>
-            </div>
-          ))
         )}
       </div>
     );
@@ -207,6 +219,16 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
 
   // Build the selected-date panel data
   const selectedDatePrices = selectedDate ? getPricesForDate(selectedDate) : [];
+
+  // Hotel selected via line click (drives highlight + quick actions)
+  const selectedHotel =
+    selectedHotelId !== null
+      ? filtered.find((h) => h.hotel_id === selectedHotelId) ?? null
+      : null;
+  const selectedHotelColor =
+    selectedHotel !== null
+      ? CHART_COLORS[filtered.indexOf(selectedHotel) % CHART_COLORS.length]
+      : undefined;
 
   return (
     <div className="bg-surface-card border border-hairline rounded-none p-2 sm:p-4">
@@ -245,6 +267,60 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
           </button>
         </div>
       </div>
+
+      {/* Quick actions for the hotel selected via line click */}
+      {selectedHotel && selectedHotelColor && (
+        <div className="flex items-center gap-2 mb-2 sm:mb-3 px-2 py-1.5 bg-surface-soft border border-hairline rounded-none">
+          <span
+            className="inline-block w-2.5 h-0.5 flex-shrink-0 rounded"
+            style={{ backgroundColor: selectedHotelColor }}
+          />
+          <span className="truncate text-xs text-body flex-1 min-w-0">
+            {selectedHotel.hotel_name}
+          </span>
+          <button
+            onClick={() => {
+              const willHide = selectedIds.has(selectedHotel.hotel_id);
+              onToggleSelected(selectedHotel.hotel_id);
+              // Bei "Ausblenden" verschwindet die Linie — Selektion aufheben
+              if (willHide) setSelectedHotelId(null);
+            }}
+            className="px-2.5 py-0.5 rounded-pill font-mono uppercase tracking-label-sm text-xs border border-hairline-strong text-muted hover:text-body hover:border-ink transition-colors flex-shrink-0"
+          >
+            {selectedIds.has(selectedHotel.hotel_id)
+              ? "Ausblenden"
+              : "Einblenden"}
+          </button>
+          <button
+            onClick={() => onToggleFavorite(selectedHotel.hotel_id)}
+            className={`text-sm flex-shrink-0 transition-colors ${
+              favorites.has(selectedHotel.hotel_id)
+                ? "text-warning hover:opacity-75"
+                : "text-muted-soft hover:text-muted"
+            }`}
+            title={
+              favorites.has(selectedHotel.hotel_id)
+                ? "Favorit entfernen"
+                : "Als Favorit markieren"
+            }
+            aria-label={
+              favorites.has(selectedHotel.hotel_id)
+                ? "Favorit entfernen"
+                : "Als Favorit markieren"
+            }
+          >
+            {favorites.has(selectedHotel.hotel_id) ? "⭐" : "☆"}
+          </button>
+          <button
+            onClick={() => setSelectedHotelId(null)}
+            className="text-muted hover:text-body text-lg leading-none flex-shrink-0"
+            title="Auswahl aufheben"
+            aria-label="Auswahl aufheben"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Empty state */}
@@ -300,15 +376,24 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
               )}
               {filtered.map((hotel, i) => {
                 const color = CHART_COLORS[i % CHART_COLORS.length];
+                const isSelected = selectedHotelId === hotel.hotel_id;
                 const isHovered = hoveredHotel === hotel.hotel_name;
-                const strokeW = isHovered ? 3 : isMany ? 1.5 : 2;
-                const opacity = hoveredHotel
-                  ? isHovered
-                    ? 1
-                    : 0.1
-                  : isMany
-                    ? 0.5
-                    : 1;
+                // A selected hotel takes precedence over hover highlighting
+                const emphasized =
+                  selectedHotelId !== null ? isSelected : isHovered;
+                const strokeW = emphasized ? 3 : isMany ? 1.5 : 2;
+                const opacity =
+                  selectedHotelId !== null
+                    ? isSelected
+                      ? 1
+                      : 0.1
+                    : hoveredHotel
+                      ? isHovered
+                        ? 1
+                        : 0.1
+                      : isMany
+                        ? 0.5
+                        : 1;
 
                 return (
                   <Line
@@ -320,8 +405,19 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
                     strokeOpacity={opacity}
                     dot={false}
                     connectNulls={false}
-                    activeDot={{ r: isHovered ? 6 : 4 }}
+                    activeDot={{ r: emphasized ? 6 : 4 }}
                     isAnimationActive={false}
+                    onClick={(_data: any, indexOrEvent: any, maybeEvent?: any) => {
+                      // Recharts 2.15.4 verdrahtet onClick am Pfad als (props, event) —
+                      // das Event daher robust aus Position 2 oder 3 ziehen.
+                      const evt = (maybeEvent ?? indexOrEvent) as
+                        | { stopPropagation?: () => void }
+                        | undefined;
+                      evt?.stopPropagation?.(); // Datums-Selektion des Charts nicht ausloesen
+                      setSelectedHotelId((prev) =>
+                        prev === hotel.hotel_id ? null : hotel.hotel_id
+                      );
+                    }}
                   />
                 );
               })}
@@ -330,13 +426,18 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
                 const gapName = filtered.find(
                   (h) => h.hotel_id === gap.hotelId
                 )?.hotel_name;
-                const gapOpacity = hoveredHotel
-                  ? gapName === hoveredHotel
-                    ? 1
-                    : 0.1
-                  : isMany
-                    ? 0.5
-                    : 1;
+                const gapOpacity =
+                  selectedHotelId !== null
+                    ? gap.hotelId === selectedHotelId
+                      ? 1
+                      : 0.1
+                    : hoveredHotel
+                      ? gapName === hoveredHotel
+                        ? 1
+                        : 0.1
+                      : isMany
+                        ? 0.5
+                        : 1;
 
                 return (
                   <ReferenceLine
@@ -352,6 +453,15 @@ export default function HotelChart({ data, selectedIds, roomType, onRoomTypeChan
                   />
                 );
               })}
+              {/* Brush: Zoom/Schieben des Datumsbereichs per Maus */}
+              <Brush
+                dataKey="date"
+                height={26}
+                stroke="#262626"
+                fill="transparent"
+                travellerWidth={8}
+                tickFormatter={formatDate}
+              />
             </LineChart>
           </ResponsiveContainer>
             </div>
