@@ -323,11 +323,11 @@ export default function App() {
       try {
         const [h, s] = await Promise.all([
           getHotels(selectedCity),
-          getStatus(selectedCity),
+          isAdmin ? getStatus(selectedCity) : Promise.resolve(null),
         ]);
         if (cancelled) return;
         setHotels(h);
-        setStatus(s);
+        if (s) setStatus(s);
         // Auto-select favorites for this city, or fall back to all active hotels
         const cityFavorites = favorites.get(selectedCity);
         if (cityFavorites && cityFavorites.size > 0) {
@@ -559,13 +559,19 @@ export default function App() {
       ) : (
         <>
       {/* Status bar (admin only) */}
-      {isAdmin && (
+      {isAdmin ? (
         <StatusBar
           status={status}
           loading={loadingData}
-          onFetch={isAdmin ? handleFetch : undefined}
+          onFetch={handleFetch}
           fetching={fetching}
         />
+      ) : (
+        loadingData && (
+          <div className="bg-surface-card border border-hairline rounded-none p-4 animate-pulse">
+            <div className="h-4 bg-surface-elevated rounded w-1/3"></div>
+          </div>
+        )
       )}
 
       {/* Fetch result notification */}
