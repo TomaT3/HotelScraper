@@ -280,16 +280,12 @@ export default function HotelChart({
           </span>
           <button
             onClick={() => {
-              const willHide = selectedIds.has(selectedHotel.hotel_id);
               onToggleSelected(selectedHotel.hotel_id);
-              // Bei "Ausblenden" verschwindet die Linie — Selektion aufheben
-              if (willHide) setSelectedHotelId(null);
+              setSelectedHotelId(null);
             }}
             className="px-2.5 py-0.5 rounded-pill font-mono uppercase tracking-label-sm text-xs border border-hairline-strong text-muted hover:text-body hover:border-ink transition-colors flex-shrink-0"
           >
-            {selectedIds.has(selectedHotel.hotel_id)
-              ? "Ausblenden"
-              : "Einblenden"}
+            Ausblenden
           </button>
           <button
             onClick={() => onToggleFavorite(selectedHotel.hotel_id)}
@@ -376,14 +372,14 @@ export default function HotelChart({
               )}
               {filtered.map((hotel, i) => {
                 const color = CHART_COLORS[i % CHART_COLORS.length];
-                const isSelected = selectedHotelId === hotel.hotel_id;
+                const isSelected = selectedHotel?.hotel_id === hotel.hotel_id;
                 const isHovered = hoveredHotel === hotel.hotel_name;
                 // A selected hotel takes precedence over hover highlighting
                 const emphasized =
-                  selectedHotelId !== null ? isSelected : isHovered;
+                  selectedHotel !== null ? isSelected : isHovered;
                 const strokeW = emphasized ? 3 : isMany ? 1.5 : 2;
                 const opacity =
-                  selectedHotelId !== null
+                  selectedHotel !== null
                     ? isSelected
                       ? 1
                       : 0.1
@@ -427,8 +423,8 @@ export default function HotelChart({
                   (h) => h.hotel_id === gap.hotelId
                 )?.hotel_name;
                 const gapOpacity =
-                  selectedHotelId !== null
-                    ? gap.hotelId === selectedHotelId
+                  selectedHotel !== null
+                    ? gap.hotelId === selectedHotel.hotel_id
                       ? 1
                       : 0.1
                     : hoveredHotel
