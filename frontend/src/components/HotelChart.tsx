@@ -311,12 +311,17 @@ export default function HotelChart({
     return () => el.removeEventListener("wheel", handleWheelZoom);
   }, [handleWheelZoom]);
 
-  // Neu geladener/gefilterter Datenbestand: wieder den vollen Bereich zeigen.
+  // Neu geladener Datumsbereich: wieder den vollen Bereich zeigen.
   // useLayoutEffect, damit der Reset vor dem Paint greift und der interne
   // Brush-Index von Recharts nicht auf dem alten Bereich stehen bleibt.
+  const rangeKey =
+    chartData.length > 0
+      ? `${chartData[0].date}~${chartData[chartData.length - 1].date}`
+      : "empty";
   useLayoutEffect(() => {
     setBrushRange({ startIndex: 0, endIndex: Math.max(0, chartData.length - 1) });
-  }, [chartData.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeKey]);
 
   return (
     <div className="bg-surface-card border border-hairline rounded-none p-2 sm:p-4">
@@ -617,6 +622,7 @@ export default function HotelChart({
                           )
                         }
                         onKeyDown={(e) => {
+                          if (e.target !== e.currentTarget) return; // Events der inneren Buttons nicht abfangen
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             setSelectedHotelId((prev) =>
