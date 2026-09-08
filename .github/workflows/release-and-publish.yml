@@ -3,130 +3,223 @@ name: Release & Publish Docker
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release (e.g. 1.6.0)'
-        required: true
-        type: string
-  push:
-    tags:
-      - "v*"
-  release:
-    types: [published]
-
-concurrency:
-  group: release-${{ github.ref_name }}
-  cancel-in-progress: false
+      bump:
+        description: "SemVer bump (empty = auto from commits)"
+        required: false
+        default: ""
+        type: choice
+        options:
+          - ""
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
-  bump-version:
-    name: Bump version files & create tag
+  release:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      version: ${{ steps.version.outputs.next }}
+      tag: ${{ steps.version.outputs.tag }}
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Bump version in HotelScraper.Api.csproj
-        run: |
-          sed -i "s|<Version>.*</Version>|<Version>${{ github.event.inputs.version }}</Version>|" backend/src/HotelScraper.Api/HotelScraper.Api.csproj
-
-      - name: Bump version in frontend/package.json
-        run: |
-          sed -i "s/\"version\": \".*\"/\"version\": \"${{ github.event.inputs.version }}\"/" frontend/package.json
-
-      - name: Commit version bump
-        run: |
-          git add backend/src/HotelScraper.Api/HotelScraper.Api.csproj frontend/package.json
-          git commit -m "chore: bump version to ${{ github.event.inputs.version }}"
-          git push
-
-      - name: Create and push tag
-        run: |
-          git tag v${{ github.event.inputs.version }}
-          git push origin v${{ github.event.inputs.version }}
-
-  changelog:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: bump-version
-    if: |
-      always() && (
-        (github.event_name == 'workflow_dispatch' && needs.bump-version.result == 'success') ||
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
-      )
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Determine tag name
-        id: tag
+      - name: Determine last version
+        id: last
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "name=v${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          latest="$(gh release list --limit 100 --json tagName \
+            -q '[.[].tagName | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | .[0]' 2>/dev/null || true)"
+          if [ -z "$latest" ]; then
+            latest="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)"
+          fi
+          echo "latest=${latest:-}" >> "$GITHUB_OUTPUT"
+
+      - name: Determine bump type
+        id: bump
+        shell: bash
+        env:
+          BUMP_INPUT: ${{ inputs.bump }}
+          LATEST_TAG: ${{ steps.last.outputs.latest }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "$BUMP_INPUT" ]; then
+            echo "bump=$BUMP_INPUT" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-      - name: Build changelog
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@v5
-        with:
-          configuration: .github/release-changelog-config.json
-          toTag: ${{ steps.tag.outputs.name }}
+          range="HEAD"
+          [ -n "$LATEST_TAG" ] && range="${LATEST_TAG}..HEAD"
+
+          # HotelScraper nutzt Merge-Commits: die Conventional-Commits stecken in den
+          # PR-Titeln, nicht in den Commit-Subjects ("Merge pull request #N from ...").
+          numbers="$(git log --first-parent --merges --pretty=format:'%s' "$range" \
+            | sed -nE 's/^Merge pull request #([0-9]+).*/\1/p' | sort -run)"
+          if [ -n "$numbers" ]; then
+            log=""
+            while IFS= read -r n; do
+              [ -z "$n" ] && continue
+              title="$(gh pr view "$n" --json title -q .title 2>/dev/null || true)"
+              [ -n "$title" ] && log+=$'\n'"$title"
+            done <<< "$numbers"
+          else
+            # Fallback ohne Merge-Commits: rohe Subjects (wie Stempeluhr).
+            log="$(git log --pretty=%s "$range")"
+          fi
+
+          if echo "$log" | grep -qiE '^breaking|BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:'; then
+            echo "bump=major" >> "$GITHUB_OUTPUT"
+          elif echo "$log" | grep -qiE '^feat(\([^)]*\))?:'; then
+            echo "bump=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "bump=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Calculate next version
+        id: version
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUMP: ${{ steps.bump.outputs.bump }}
+          LATEST_TAG: ${{ steps.last.outputs.latest }}
+        run: |
+          version="${LATEST_TAG#v}"
+          [ -z "$version" ] && version="0.0.0"
+
+          IFS='.' read -r major minor patch <<< "$version"
+
+          case "$BUMP" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+            *) echo "Unsupported bump: $BUMP" >&2; exit 1 ;;
+          esac
+
+          next="$major.$minor.$patch"
+          {
+            echo "next=$next"
+            echo "tag=v$next"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST_TAG: ${{ steps.last.outputs.latest }}
+          NEXT_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          range="HEAD"
+          [ -n "$LATEST_TAG" ] && range="${LATEST_TAG}..HEAD"
+
+          notes="## What's Changed"
+
+          breaking=""; features=""; fixes=""; perf=""; other=""
+
+          # Changelog aus den PR-Titeln der Merge-Commits (nicht aus rohen Subjects):
+          numbers="$(git log --first-parent --merges --pretty=format:'%s' "$range" \
+            | sed -nE 's/^Merge pull request #([0-9]+).*/\1/p' | sort -run)"
+          if [ -n "$numbers" ]; then
+            while IFS= read -r n; do
+              [ -z "$n" ] && continue
+              title="$(gh pr view "$n" --json title -q .title 2>/dev/null || true)"
+              [ -z "$title" ] && continue
+              entry="- #$n $title"
+              if echo "$title" | grep -qiE '^breaking|BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:'; then
+                breaking+=$'\n'"$entry"
+              elif echo "$title" | grep -qiE '^feat(\([^)]*\))?:'; then
+                features+=$'\n'"$entry"
+              elif echo "$title" | grep -qiE '^fix(\([^)]*\))?:'; then
+                fixes+=$'\n'"$entry"
+              elif echo "$title" | grep -qiE '^perf(\([^)]*\))?:'; then
+                perf+=$'\n'"$entry"
+              else
+                other+=$'\n'"$entry"
+              fi
+            done <<< "$numbers"
+          else
+            # Fallback ohne Merge-Commits: rohe Subjects kategorisieren (Squash-/Rebase-Merges, Direkt-Pushes)
+            while IFS= read -r s; do
+              [ -z "$s" ] && continue
+              entry="- $s"
+              if echo "$s" | grep -qiE '^breaking|BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:'; then
+                breaking+=$'\n'"$entry"
+              elif echo "$s" | grep -qiE '^feat(\([^)]*\))?:'; then
+                features+=$'\n'"$entry"
+              elif echo "$s" | grep -qiE '^fix(\([^)]*\))?:'; then
+                fixes+=$'\n'"$entry"
+              elif echo "$s" | grep -qiE '^perf(\([^)]*\))?:'; then
+                perf+=$'\n'"$entry"
+              else
+                other+=$'\n'"$entry"
+              fi
+            done <<< "$(git log --pretty=%s "$range")"
+          fi
+
+          if [ -n "$features" ]; then
+            notes+=$'\n\n### Features\n'"$features"
+          fi
+          if [ -n "$fixes" ]; then
+            notes+=$'\n\n### Bug Fixes\n'"$fixes"
+          fi
+          if [ -n "$perf" ]; then
+            notes+=$'\n\n### Performance\n'"$perf"
+          fi
+          if [ -n "$breaking" ]; then
+            notes+=$'\n\n### Breaking Changes\n'"$breaking"
+          fi
+          if [ -n "$other" ]; then
+            notes+=$'\n\n### Other\n'"$other"
+          fi
+          if [ "$(printf '%s' "$notes" | wc -l)" -le 1 ]; then
+            notes+=$'\n\n- No notable changes.'
+          fi
+          notes+="$(printf '\n\n**Full Changelog**: https://github.com/%s/compare/%s...%s' "$GITHUB_REPOSITORY" "${LATEST_TAG:-$(git rev-list --max-parents=0 HEAD | head -n 1)}" "$NEXT_TAG")"
+
+          file="$(mktemp)"
+          printf '%s\n' "$notes" > "$file"
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+          cat "$file"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          body: ${{ steps.changelog.outputs.changelog }}
-          tag_name: ${{ steps.tag.outputs.name }}
-          name: ${{ steps.tag.outputs.name }}
-          draft: false
-          prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          TITLE: ${{ steps.version.outputs.tag }}
+          NOTES_FILE: ${{ steps.changelog.outputs.file }}
+        run: gh release create "$TAG" --target "$GITHUB_SHA" --title "$TITLE" --notes-file "$NOTES_FILE"
+
+      - name: Summary
+        shell: bash
+        env:
+          LATEST_TAG: ${{ steps.last.outputs.latest }}
+          TAG: ${{ steps.version.outputs.tag }}
+          BUMP: ${{ steps.bump.outputs.bump }}
+        run: |
+          {
+            echo "## Release created"
+            echo ""
+            echo "- Previous: ${LATEST_TAG:-none}"
+            echo "- Released: $TAG"
+            echo "- Bump: $BUMP"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   docker:
-    name: Build & Push Docker Image
     runs-on: ubuntu-latest
-    needs: changelog
-    if: |
-      always() && (
-        needs.changelog.result == 'success' ||
-        needs.changelog.result == 'skipped'
-      )
+    needs: release
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Extract version from tag
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            TAG="${{ github.event.release.tag_name }}"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="v${{ github.event.inputs.version }}"
-          else
-            TAG="${{ github.ref_name }}"
-          fi
-          # Strip 'v' prefix for NuGet-compatible version (e.g. v1.8.0 → 1.8.0)
-          VERSION="${TAG#v}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        with:
+          ref: ${{ needs.release.outputs.tag }}
 
       - name: Docker metadata
         id: meta
@@ -134,8 +227,8 @@ jobs:
         with:
           images: tomat3/hotel-price-scraper
           tags: |
-            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.tag }}
+            type=semver,pattern={{version}},value=${{ needs.release.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.release.outputs.tag }}
 
       - name: Log in to DockerHub
         uses: docker/login-action@v3
@@ -151,4 +244,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ steps.version.outputs.version }}
+            VERSION=${{ needs.release.outputs.version }}
