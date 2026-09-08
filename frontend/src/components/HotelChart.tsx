@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import {
   LineChart,
   Line,
@@ -29,6 +29,10 @@ interface ChartDataPoint {
   [hotelName: string]: number | string;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
 function useWindowWidth() {
   const [width, setWidth] = useState(window.innerWidth);
   useEffect(() => {
@@ -54,6 +58,12 @@ export default function HotelChart({
   const [legendOpen, setLegendOpen] = useState(true);
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
+  // Kontrollierter Brush-Bereich; null = kompletter Datensatz (uncontrolled)
+  const [brushRange, setBrushRange] = useState<{
+    startIndex: number;
+    endIndex: number;
+  } | null>(null);
+  const chartWrapperRef = useRef<HTMLDivElement | null>(null);
 
   const filtered = useMemo(
     () => data.filter((h) => selectedIds.has(h.hotel_id)),
@@ -172,6 +182,7 @@ export default function HotelChart({
       if (!point) return [];
       return filtered
         .map((hotel) => ({
+          hotel_id: hotel.hotel_id,
           hotel_name: hotel.hotel_name,
           stars: hotel.stars,
           price: point[hotel.hotel_name] as number | undefined,
@@ -203,9 +214,14 @@ export default function HotelChart({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
 
+    // Hit-Linien duplizieren den dataKey der sichtbaren Linien → deduplizieren
+    const deduped = payload.filter((e: any, i: number, arr: any[]) => {
+      const key = e.dataKey ?? e.name;
+      return arr.findIndex((x: any) => (x.dataKey ?? x.name) === key) === i;
+    });
     const items = hoveredHotel
-      ? payload.filter((e: any) => e.name === hoveredHotel)
-      : payload.sort((a: any, b: any) => (a.value ?? 0) - (b.value ?? 0));
+      ? deduped.filter((e: any) => e.name === hoveredHotel)
+      : deduped.sort((a: any, b: any) => (a.value ?? 0) - (b.value ?? 0));
 
     return (
       <div className="bg-surface-card border border-hairline rounded-none p-3 text-sm max-w-xs">
@@ -248,6 +264,64 @@ export default function HotelChart({
     selectedHotel !== null
       ? CHART_COLORS[filtered.indexOf(selectedHotel) % CHART_COLORS.length]
       : undefined;
+
+  // Mausrad-Zoom: bei markiertem Datum um dieses zoomen, sonst um die Mitte
+  // des aktuell sichtbaren Bereichs. Reinzoomen bei deltaY < 0, rauszoomen
+  // bei deltaY > 0; der Fokus bleibt proportional an seiner Bildschirmposition.
+  const handleWheelZoom = useCallback(
+    (e: WheelEvent) => {
+      const n = chartData.length;
+      if (n < 2) return;
+      const base = brushRange ?? { startIndex: 0, endIndex: n - 1 };
+      const span = base.endIndex - base.startIndex + 1;
+      const zoomingIn = e.deltaY < 0;
+      // An den Zoom-Grenzen das Seiten-Scrollen nicht blockieren
+      if ((zoomingIn && span <= 2) || (!zoomingIn && span >= n)) return;
+      e.preventDefault();
+      const focusIdx = selectedDate
+        ? chartData.findIndex((d) => d.date === selectedDate)
+        : -1;
+      const factor = zoomingIn ? 0.7 : 1.4;
+      setBrushRange((prev) => {
+        const b = prev ?? { startIndex: 0, endIndex: n - 1 };
+        const s = b.endIndex - b.startIndex + 1;
+        const focus =
+          focusIdx >= 0
+            ? focusIdx
+            : Math.round((b.startIndex + b.endIndex) / 2);
+        const newSpan = clamp(Math.round(s * factor), 2, n);
+        const norm = s > 1 ? (focus - b.startIndex) / (s - 1) : 0.5;
+        const newStart = clamp(
+          Math.round(focus - norm * (newSpan - 1)),
+          0,
+          n - newSpan
+        );
+        return { startIndex: newStart, endIndex: newStart + newSpan - 1 };
+      });
+    },
+    [chartData, selectedDate, brushRange]
+  );
+
+  // React bindet Wheel-Listener teils passiv — nativer Listener mit
+  // { passive: false }, damit preventDefault() das Seiten-Scrollen stoppt.
+  useEffect(() => {
+    const el = chartWrapperRef.current;
+    if (!el) return;
+    el.addEventListener("wheel", handleWheelZoom, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheelZoom);
+  }, [handleWheelZoom]);
+
+  // Neu geladener Datumsbereich: wieder den vollen Bereich zeigen.
+  // useLayoutEffect, damit der Reset vor dem Paint greift und der interne
+  // Brush-Index von Recharts nicht auf dem alten Bereich stehen bleibt.
+  const rangeKey =
+    chartData.length > 0
+      ? `${chartData[0].date}~${chartData[chartData.length - 1].date}~${chartData.length}`
+      : "empty";
+  useLayoutEffect(() => {
+    setBrushRange({ startIndex: 0, endIndex: Math.max(0, chartData.length - 1) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeKey]);
 
   return (
     <div className="bg-surface-card border border-hairline rounded-none p-2 sm:p-4">
@@ -349,7 +423,7 @@ export default function HotelChart({
         ) : (
           <>
             {/* Chart */}
-            <div className="flex-1 min-w-0">
+            <div ref={chartWrapperRef} className="flex-1 min-w-0">
           <ResponsiveContainer width="100%" height={chartHeight}>
             <LineChart
               data={chartData}
@@ -422,17 +496,6 @@ export default function HotelChart({
                     connectNulls={false}
                     activeDot={{ r: emphasized ? 6 : 4 }}
                     isAnimationActive={false}
-                    onClick={(_data: any, indexOrEvent: any, maybeEvent?: any) => {
-                      // Recharts 2.15.4 verdrahtet onClick am Pfad als (props, event) —
-                      // das Event daher robust aus Position 2 oder 3 ziehen.
-                      const evt = (maybeEvent ?? indexOrEvent) as
-                        | { stopPropagation?: () => void }
-                        | undefined;
-                      evt?.stopPropagation?.(); // Datums-Selektion des Charts nicht ausloesen
-                      setSelectedHotelId((prev) =>
-                        prev === hotel.hotel_id ? null : hotel.hotel_id
-                      );
-                    }}
                   />
                 );
               })}
@@ -468,7 +531,40 @@ export default function HotelChart({
                   />
                 );
               })}
-              {/* Brush: Zoom/Schieben des Datumsbereichs per Maus */}
+              {/* Unsichtbare dicke Hit-Linien: tragen Klick + Hover und liegen
+                  ueber den sichtbaren Linien + Gap-Bruecken (fangen Klicks) */}
+              {filtered.map((hotel) => (
+                <Line
+                  key={`hit-${hotel.hotel_id}`}
+                  type="monotone"
+                  dataKey={hotel.hotel_name}
+                  stroke="transparent"
+                  strokeWidth={10}
+                  dot={false}
+                  activeDot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                  onClick={(
+                    _data: any,
+                    indexOrEvent: any,
+                    maybeEvent?: any
+                  ) => {
+                    // Recharts 2.15.4 verdrahtet onClick am Pfad als
+                    // (props, event) — Event daher robust aus Position 2
+                    // oder 3 ziehen.
+                    const evt = (maybeEvent ?? indexOrEvent) as
+                      | { stopPropagation?: () => void }
+                      | undefined;
+                    evt?.stopPropagation?.(); // Datums-Selektion des Charts nicht ausloesen
+                    setSelectedHotelId((prev) =>
+                      prev === hotel.hotel_id ? null : hotel.hotel_id
+                    );
+                  }}
+                  onMouseEnter={() => setHoveredHotel(hotel.hotel_name)}
+                  onMouseLeave={() => setHoveredHotel(null)}
+                />
+              ))}
+              {/* Brush: Zoom/Schieben des Datumsbereichs per Maus (controlled) */}
               <Brush
                 dataKey="date"
                 height={26}
@@ -476,6 +572,16 @@ export default function HotelChart({
                 fill="transparent"
                 travellerWidth={8}
                 tickFormatter={formatDate}
+                startIndex={brushRange?.startIndex}
+                endIndex={brushRange?.endIndex}
+                onChange={(r) => {
+                  if (r.startIndex === undefined || r.endIndex === undefined)
+                    return;
+                  setBrushRange({
+                    startIndex: r.startIndex,
+                    endIndex: r.endIndex,
+                  });
+                }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -502,28 +608,102 @@ export default function HotelChart({
                   </button>
                 </div>
                 <div className="overflow-y-auto flex-1 space-y-1 text-sm">
-                  {selectedDatePrices.map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex justify-between items-center gap-2 px-2 py-1 rounded-none hover:bg-surface-elevated"
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span
-                          className="inline-block w-2.5 h-0.5 flex-shrink-0 rounded"
-                          style={{ backgroundColor: h.color }}
-                        />
-                        <span className="truncate text-body">{h.hotel_name}</span>
-                        {h.stars && (
-                          <span className="text-warning text-xs flex-shrink-0">
-                            {"★".repeat(h.stars)}
+                  {selectedDatePrices.map((h) => {
+                    const rowSelected = h.hotel_id === selectedHotelId;
+                    const isFavorite = favorites.has(h.hotel_id);
+                    return (
+                      <div
+                        key={h.hotel_id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() =>
+                          setSelectedHotelId((prev) =>
+                            prev === h.hotel_id ? null : h.hotel_id
+                          )
+                        }
+                        onKeyDown={(e) => {
+                          if (e.target !== e.currentTarget) return; // Events der inneren Buttons nicht abfangen
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedHotelId((prev) =>
+                              prev === h.hotel_id ? null : h.hotel_id
+                            );
+                          }
+                        }}
+                        className={`flex items-center gap-2 px-2 py-1 cursor-pointer transition-colors ${
+                          rowSelected
+                            ? "bg-surface-elevated"
+                            : "hover:bg-surface-elevated"
+                        }`}
+                        style={
+                          rowSelected
+                            ? { boxShadow: `inset 2px 0 0 ${h.color}` }
+                            : undefined
+                        }
+                        title={
+                          rowSelected
+                            ? "Auswahl aufheben"
+                            : "Im Chart hervorheben"
+                        }
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span
+                            className="inline-block w-2.5 h-0.5 flex-shrink-0 rounded"
+                            style={{ backgroundColor: h.color }}
+                          />
+                          <span
+                            className={`truncate ${
+                              rowSelected ? "text-ink" : "text-body"
+                            }`}
+                          >
+                            {h.hotel_name}
                           </span>
-                        )}
+                          {h.stars ? (
+                            <span className="text-warning text-xs flex-shrink-0">
+                              {"★".repeat(h.stars)}
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className="text-ink flex-shrink-0">
+                          {h.price?.toFixed(0)} €
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleFavorite(h.hotel_id);
+                          }}
+                          className={`text-sm flex-shrink-0 transition-colors ${
+                            isFavorite
+                              ? "text-warning hover:opacity-75"
+                              : "text-muted-soft hover:text-muted"
+                          }`}
+                          title={
+                            isFavorite
+                              ? "Favorit entfernen"
+                              : "Als Favorit markieren"
+                          }
+                          aria-label={
+                            isFavorite
+                              ? "Favorit entfernen"
+                              : "Als Favorit markieren"
+                          }
+                        >
+                          {isFavorite ? "⭐" : "☆"}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleSelected(h.hotel_id);
+                          }}
+                          className="px-1.5 py-0.5 rounded-pill font-mono uppercase tracking-label-sm text-[10px] border border-hairline-strong text-muted hover:text-body hover:border-ink transition-colors flex-shrink-0"
+                          title="Hotel ausblenden"
+                          aria-label={`${h.hotel_name} ausblenden`}
+                        >
+                          Ausblenden
+                        </button>
                       </div>
-                      <span className="text-ink flex-shrink-0">
-                        {h.price?.toFixed(0)} €
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <p className="text-xs text-muted mt-2 pt-2 border-t border-hairline text-center">
                   {selectedDatePrices.length} Hotels
