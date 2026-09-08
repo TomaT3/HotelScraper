@@ -55,24 +55,43 @@ export default function HotelChart({
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 768;
 
-  const filtered = data.filter((h) => selectedIds.has(h.hotel_id));
+  const filtered = useMemo(
+    () => data.filter((h) => selectedIds.has(h.hotel_id)),
+    [data, selectedIds]
+  );
   const isMany = filtered.length > 15;
 
   // Merge all hotel prices into a single dataset keyed by date
-  const dateMap = new Map<string, ChartDataPoint>();
-
-  for (const hotel of filtered) {
-    for (const p of hotel.prices) {
-      if (!dateMap.has(p.date)) {
-        dateMap.set(p.date, { date: p.date });
+  const dateMap = useMemo(() => {
+    const map = new Map<string, ChartDataPoint>();
+    for (const hotel of filtered) {
+      for (const p of hotel.prices) {
+        if (!map.has(p.date)) {
+          map.set(p.date, { date: p.date });
+        }
+        map.get(p.date)![hotel.hotel_name] = p.price_eur;
       }
-      dateMap.get(p.date)![hotel.hotel_name] = p.price_eur;
     }
-  }
+    return map;
+  }, [filtered]);
 
-  const chartData = Array.from(dateMap.values()).sort((a, b) =>
-    a.date.localeCompare(b.date)
+  const chartData = useMemo(
+    () =>
+      Array.from(dateMap.values()).sort((a, b) =>
+        a.date.localeCompare(b.date)
+      ),
+    [dateMap]
   );
+
+  // Reset stale selection when the selected hotel leaves the filtered set
+  useEffect(() => {
+    if (
+      selectedHotelId !== null &&
+      !filtered.some((h) => h.hotel_id === selectedHotelId)
+    ) {
+      setSelectedHotelId(null);
+    }
+  }, [filtered, selectedHotelId]);
 
   // Compute consecutive weekend spans (Sat–Sun) for background highlighting
   const weekendSpans = useMemo(() => {
