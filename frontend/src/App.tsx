@@ -558,13 +558,15 @@ export default function App() {
         <AdminView currentUserId={user.id} />
       ) : (
         <>
-      {/* Status bar */}
-      <StatusBar
-        status={status}
-        loading={loadingData}
-        onFetch={isAdmin ? handleFetch : undefined}
-        fetching={fetching}
-      />
+      {/* Status bar (admin only) */}
+      {isAdmin && (
+        <StatusBar
+          status={status}
+          loading={loadingData}
+          onFetch={isAdmin ? handleFetch : undefined}
+          fetching={fetching}
+        />
+      )}
 
       {/* Fetch result notification */}
       {fetchResult && (
