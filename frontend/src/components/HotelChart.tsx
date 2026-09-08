@@ -316,7 +316,7 @@ export default function HotelChart({
   // Brush-Index von Recharts nicht auf dem alten Bereich stehen bleibt.
   const rangeKey =
     chartData.length > 0
-      ? `${chartData[0].date}~${chartData[chartData.length - 1].date}`
+      ? `${chartData[0].date}~${chartData[chartData.length - 1].date}~${chartData.length}`
       : "empty";
   useLayoutEffect(() => {
     setBrushRange({ startIndex: 0, endIndex: Math.max(0, chartData.length - 1) });
