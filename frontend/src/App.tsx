@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import StatusBar from "./components/StatusBar";
+import StatusBarSkeleton from "./components/StatusBarSkeleton";
 import HotelFilter from "./components/HotelFilter";
 import DateRangePicker from "./components/DateRangePicker";
 import HotelChart from "./components/HotelChart";
@@ -327,7 +328,7 @@ export default function App() {
         ]);
         if (cancelled) return;
         setHotels(h);
-        if (s) setStatus(s);
+        setStatus(isAdmin ? s : null);
         // Auto-select favorites for this city, or fall back to all active hotels
         const cityFavorites = favorites.get(selectedCity);
         if (cityFavorites && cityFavorites.size > 0) {
@@ -567,11 +568,7 @@ export default function App() {
           fetching={fetching}
         />
       ) : (
-        loadingData && (
-          <div className="bg-surface-card border border-hairline rounded-none p-4 animate-pulse">
-            <div className="h-4 bg-surface-elevated rounded w-1/3"></div>
-          </div>
-        )
+        loadingData && <StatusBarSkeleton />
       )}
 
       {/* Fetch result notification */}
