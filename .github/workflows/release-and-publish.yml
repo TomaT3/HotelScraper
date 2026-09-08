@@ -77,7 +77,7 @@ jobs:
 
           if echo "$log" | grep -qiE '^breaking|BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:'; then
             echo "bump=major" >> "$GITHUB_OUTPUT"
-          elif echo "$log" | grep -qE '^feat(\([^)]*\))?:'; then
+          elif echo "$log" | grep -qiE '^feat(\([^)]*\))?:'; then
             echo "bump=minor" >> "$GITHUB_OUTPUT"
           else
             echo "bump=patch" >> "$GITHUB_OUTPUT"
@@ -134,11 +134,11 @@ jobs:
               entry="- #$n $title"
               if echo "$title" | grep -qiE '^breaking|BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:'; then
                 breaking+=$'\n'"$entry"
-              elif echo "$title" | grep -qE '^feat(\([^)]*\))?:'; then
+              elif echo "$title" | grep -qiE '^feat(\([^)]*\))?:'; then
                 features+=$'\n'"$entry"
-              elif echo "$title" | grep -qE '^fix(\([^)]*\))?:'; then
+              elif echo "$title" | grep -qiE '^fix(\([^)]*\))?:'; then
                 fixes+=$'\n'"$entry"
-              elif echo "$title" | grep -qE '^perf(\([^)]*\))?:'; then
+              elif echo "$title" | grep -qiE '^perf(\([^)]*\))?:'; then
                 perf+=$'\n'"$entry"
               else
                 other+=$'\n'"$entry"
@@ -151,11 +151,11 @@ jobs:
               entry="- $s"
               if echo "$s" | grep -qiE '^breaking|BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:'; then
                 breaking+=$'\n'"$entry"
-              elif echo "$s" | grep -qE '^feat(\([^)]*\))?:'; then
+              elif echo "$s" | grep -qiE '^feat(\([^)]*\))?:'; then
                 features+=$'\n'"$entry"
-              elif echo "$s" | grep -qE '^fix(\([^)]*\))?:'; then
+              elif echo "$s" | grep -qiE '^fix(\([^)]*\))?:'; then
                 fixes+=$'\n'"$entry"
-              elif echo "$s" | grep -qE '^perf(\([^)]*\))?:'; then
+              elif echo "$s" | grep -qiE '^perf(\([^)]*\))?:'; then
                 perf+=$'\n'"$entry"
               else
                 other+=$'\n'"$entry"
