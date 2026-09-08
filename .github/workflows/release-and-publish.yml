@@ -3,9 +3,15 @@ name: Release & Publish Docker
 on:
   workflow_dispatch:
     inputs:
+      bump:
+        description: 'Increment (auto-bump; default patch)'
+        required: false
+        default: 'patch'
+        type: choice
+        options: [patch, minor, major]
       version:
-        description: 'Version to release (e.g. 1.6.0)'
-        required: true
+        description: 'Explicit version (optional; overrides auto-bump, e.g. 1.13.0)'
+        required: false
         type: string
   push:
     tags:
@@ -24,12 +30,15 @@ jobs:
   bump-version:
     name: Bump version files & create tag
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.determine.outputs.version }}
     if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure Git
@@ -37,24 +46,42 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Determine version
+        id: determine
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            LATEST="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null | sed 's/^v//')"
+            if [ -z "$LATEST" ]; then LATEST="0.0.0"; fi
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
+            case "${{ github.event.inputs.bump }}" in
+              major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+              *)     PATCH=$((PATCH+1)) ;;
+            esac
+            VERSION="$MAJOR.$MINOR.$PATCH"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Bump version in HotelScraper.Api.csproj
         run: |
-          sed -i "s|<Version>.*</Version>|<Version>${{ github.event.inputs.version }}</Version>|" backend/src/HotelScraper.Api/HotelScraper.Api.csproj
+          sed -i "s|<Version>.*</Version>|<Version>${{ steps.determine.outputs.version }}</Version>|" backend/src/HotelScraper.Api/HotelScraper.Api.csproj
 
       - name: Bump version in frontend/package.json
         run: |
-          sed -i "s/\"version\": \".*\"/\"version\": \"${{ github.event.inputs.version }}\"/" frontend/package.json
+          sed -i "s/\"version\": \".*\"/\"version\": \"${{ steps.determine.outputs.version }}\"/" frontend/package.json
 
       - name: Commit version bump
         run: |
           git add backend/src/HotelScraper.Api/HotelScraper.Api.csproj frontend/package.json
-          git commit -m "chore: bump version to ${{ github.event.inputs.version }}"
+          git commit -m "chore: bump version to ${{ steps.determine.outputs.version }}"
           git push
 
       - name: Create and push tag
         run: |
-          git tag v${{ github.event.inputs.version }}
-          git push origin v${{ github.event.inputs.version }}
+          git tag v${{ steps.determine.outputs.version }}
+          git push origin v${{ steps.determine.outputs.version }}
 
   changelog:
     name: Create GitHub Release
@@ -75,7 +102,7 @@ jobs:
         id: tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "name=v${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "name=v${{ needs.bump-version.outputs.version }}" >> "$GITHUB_OUTPUT"
           else
             echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
@@ -103,7 +130,7 @@ jobs:
   docker:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
-    needs: changelog
+    needs: [changelog, bump-version]
     if: |
       always() && (
         needs.changelog.result == 'success' ||
@@ -119,7 +146,7 @@ jobs:
           if [ "${{ github.event_name }}" = "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="v${{ github.event.inputs.version }}"
+            TAG="v${{ needs.bump-version.outputs.version }}"
           else
             TAG="${{ github.ref_name }}"
           fi
