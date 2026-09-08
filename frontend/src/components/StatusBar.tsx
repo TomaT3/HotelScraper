@@ -1,4 +1,5 @@
 import type { Status } from "../api/types";
+import StatusBarSkeleton from "./StatusBarSkeleton";
 
 interface Props {
   status: Status | null;
@@ -14,11 +15,7 @@ export default function StatusBar({
   fetching,
 }: Props) {
   if (loading || !status) {
-    return (
-      <div className="bg-surface-card border border-hairline rounded-none p-4 animate-pulse">
-        <div className="h-4 bg-surface-elevated rounded w-1/3"></div>
-      </div>
-    );
+    return <StatusBarSkeleton />;
   }
 
   const lastFetch = status.last_fetch
