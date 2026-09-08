@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   release:
@@ -38,7 +39,7 @@ jobs:
           latest="$(gh release list --limit 100 --json tagName \
             -q '[.[].tagName | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | .[0]' 2>/dev/null || true)"
           if [ -z "$latest" ]; then
-            latest="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1)"
+            latest="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)"
           fi
           echo "latest=${latest:-}" >> "$GITHUB_OUTPUT"
 
@@ -61,7 +62,7 @@ jobs:
           # HotelScraper nutzt Merge-Commits: die Conventional-Commits stecken in den
           # PR-Titeln, nicht in den Commit-Subjects ("Merge pull request #N from ...").
           numbers="$(git log --first-parent --merges --pretty=format:'%s' "$range" \
-            | sed -nE 's/^Merge pull request #([0-9]+).*/\1/p' | sort -un)"
+            | sed -nE 's/^Merge pull request #([0-9]+).*/\1/p' | sort -run)"
           if [ -n "$numbers" ]; then
             log=""
             while IFS= read -r n; do
@@ -120,11 +121,12 @@ jobs:
 
           notes="## What's Changed"
 
+          breaking=""; features=""; fixes=""; perf=""; other=""
+
           # Changelog aus den PR-Titeln der Merge-Commits (nicht aus rohen Subjects):
           numbers="$(git log --first-parent --merges --pretty=format:'%s' "$range" \
-            | sed -nE 's/^Merge pull request #([0-9]+).*/\1/p' | sort -un)"
+            | sed -nE 's/^Merge pull request #([0-9]+).*/\1/p' | sort -run)"
           if [ -n "$numbers" ]; then
-            breaking=""; features=""; fixes=""; perf=""; other=""
             while IFS= read -r n; do
               [ -z "$n" ] && continue
               title="$(gh pr view "$n" --json title -q .title 2>/dev/null || true)"
@@ -142,6 +144,23 @@ jobs:
                 other+=$'\n'"$entry"
               fi
             done <<< "$numbers"
+          else
+            # Fallback ohne Merge-Commits: rohe Subjects kategorisieren (Squash-/Rebase-Merges, Direkt-Pushes)
+            while IFS= read -r s; do
+              [ -z "$s" ] && continue
+              entry="- $s"
+              if echo "$s" | grep -qiE '^breaking|BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:'; then
+                breaking+=$'\n'"$entry"
+              elif echo "$s" | grep -qE '^feat(\([^)]*\))?:'; then
+                features+=$'\n'"$entry"
+              elif echo "$s" | grep -qE '^fix(\([^)]*\))?:'; then
+                fixes+=$'\n'"$entry"
+              elif echo "$s" | grep -qE '^perf(\([^)]*\))?:'; then
+                perf+=$'\n'"$entry"
+              else
+                other+=$'\n'"$entry"
+              fi
+            done <<< "$(git log --pretty=%s "$range")"
           fi
 
           if [ -n "$features" ]; then
