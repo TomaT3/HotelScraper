@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import {
   LineChart,
   Line,
@@ -214,9 +214,14 @@ export default function HotelChart({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
 
+    // Hit-Linien duplizieren den dataKey der sichtbaren Linien → deduplizieren
+    const deduped = payload.filter((e: any, i: number, arr: any[]) => {
+      const key = e.dataKey ?? e.name;
+      return arr.findIndex((x: any) => (x.dataKey ?? x.name) === key) === i;
+    });
     const items = hoveredHotel
-      ? payload.filter((e: any) => e.name === hoveredHotel)
-      : payload.sort((a: any, b: any) => (a.value ?? 0) - (b.value ?? 0));
+      ? deduped.filter((e: any) => e.name === hoveredHotel)
+      : deduped.sort((a: any, b: any) => (a.value ?? 0) - (b.value ?? 0));
 
     return (
       <div className="bg-surface-card border border-hairline rounded-none p-3 text-sm max-w-xs">
@@ -267,21 +272,25 @@ export default function HotelChart({
     (e: WheelEvent) => {
       const n = chartData.length;
       if (n < 2) return;
+      const base = brushRange ?? { startIndex: 0, endIndex: n - 1 };
+      const span = base.endIndex - base.startIndex + 1;
+      const zoomingIn = e.deltaY < 0;
+      // An den Zoom-Grenzen das Seiten-Scrollen nicht blockieren
+      if ((zoomingIn && span <= 2) || (!zoomingIn && span >= n)) return;
       e.preventDefault();
       const focusIdx = selectedDate
         ? chartData.findIndex((d) => d.date === selectedDate)
         : -1;
-      const factor = e.deltaY < 0 ? 0.7 : 1.4;
+      const factor = zoomingIn ? 0.7 : 1.4;
       setBrushRange((prev) => {
-        const base = prev ?? { startIndex: 0, endIndex: n - 1 };
-        const span = base.endIndex - base.startIndex + 1;
+        const b = prev ?? { startIndex: 0, endIndex: n - 1 };
+        const s = b.endIndex - b.startIndex + 1;
         const focus =
           focusIdx >= 0
             ? focusIdx
-            : Math.round((base.startIndex + base.endIndex) / 2);
-        const newSpan = clamp(Math.round(span * factor), 2, n);
-        const norm =
-          span > 1 ? (focus - base.startIndex) / (span - 1) : 0.5;
+            : Math.round((b.startIndex + b.endIndex) / 2);
+        const newSpan = clamp(Math.round(s * factor), 2, n);
+        const norm = s > 1 ? (focus - b.startIndex) / (s - 1) : 0.5;
         const newStart = clamp(
           Math.round(focus - norm * (newSpan - 1)),
           0,
@@ -290,7 +299,7 @@ export default function HotelChart({
         return { startIndex: newStart, endIndex: newStart + newSpan - 1 };
       });
     },
-    [chartData, selectedDate]
+    [chartData, selectedDate, brushRange]
   );
 
   // React bindet Wheel-Listener teils passiv — nativer Listener mit
@@ -303,8 +312,10 @@ export default function HotelChart({
   }, [handleWheelZoom]);
 
   // Neu geladener/gefilterter Datenbestand: wieder den vollen Bereich zeigen.
-  useEffect(() => {
-    setBrushRange(null);
+  // useLayoutEffect, damit der Reset vor dem Paint greift und der interne
+  // Brush-Index von Recharts nicht auf dem alten Bereich stehen bleibt.
+  useLayoutEffect(() => {
+    setBrushRange({ startIndex: 0, endIndex: Math.max(0, chartData.length - 1) });
   }, [chartData.length]);
 
   return (
@@ -598,11 +609,21 @@ export default function HotelChart({
                     return (
                       <div
                         key={h.hotel_id}
+                        role="button"
+                        tabIndex={0}
                         onClick={() =>
                           setSelectedHotelId((prev) =>
                             prev === h.hotel_id ? null : h.hotel_id
                           )
                         }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedHotelId((prev) =>
+                              prev === h.hotel_id ? null : h.hotel_id
+                            );
+                          }
+                        }}
                         className={`flex items-center gap-2 px-2 py-1 cursor-pointer transition-colors ${
                           rowSelected
                             ? "bg-surface-elevated"
